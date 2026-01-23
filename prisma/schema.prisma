@@ -64,7 +64,7 @@ enum UserRole {
 model Video {
   id            String      @id @default(uuid()) @db.Uuid
   bunnyVideoId  String      @unique @map("bunny_video_id") // External Bunny Stream video ID (critical reference)
-  
+  tags          String[]    @default([])
   // Ownership
   userId        String      @map("user_id") @db.Uuid
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -88,12 +88,17 @@ model Video {
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   publishedAt   DateTime?   @map("published_at") // When status changed to PUBLISHED
+
+  // Add search index for full-text search
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, name: "title_search_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, name: "description_search_idx")
+  @@index([tags(ops: raw("gin_trgm_ops"))], type: Gin, name: "tags_search_idx")
   
   // Relations
   comments      Comment[]
   likes         Like[]
   videoViews    VideoView[]
-  tags          VideoTag[]  // Many-to-many through join table
+  videoTags     VideoTag[]  // Many-to-many through join table
 
   // Performance indexes
   @@index([createdAt(sort: Desc)]) // For "Newest" feed

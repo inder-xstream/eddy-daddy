@@ -3,7 +3,7 @@
 import { useAuthModal } from '@/components/providers/auth-modal-provider';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from  'next/navigation';
 import { registerUser } from '@/server/actions/auth';
 import Link from 'next/link';
 

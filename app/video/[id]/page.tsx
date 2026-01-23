@@ -1,5 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { VideoPlayer } from '@/components/video/video-player';
+import { LikeButton } from '@/components/video/like-button';
+import { ViewTracker } from '@/components/video/view-tracker';
+import CommentSection from '@/components/comments/comment-section';
+import { getLikeStatus } from '@/server/actions/engagement';
+import { getViewCount } from '@/server/actions/view';
+import { getComments } from '@/server/actions/comment';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@/lib/auth-helper';
@@ -84,11 +90,19 @@ export default async function VideoPage({ params }: VideoPageProps) {
     );
   }
 
-  // Increment view count (in production, you'd want to track unique views)
-  await prisma.video.update({
-    where: { id: video.id },
-    data: { viewsCount: { increment: 1 } },
+  // Fetch like status and view count from Redis
+  const { isLiked, likeCount } = await getLikeStatus(video.id);
+  const viewCount = await getViewCount(video.id);
+
+  // Fetch initial comments (top-level only, 10 at a time)
+  const commentsResult = await getComments({
+    videoId: video.id,
+    parentId: null,
+    limit: 10,
   });
+
+  const initialComments = commentsResult.success ? commentsResult.comments || [] : [];
+  const initialNextCursor = commentsResult.success ? commentsResult.nextCursor || null : null;
 
   // Fetch related videos
   const relatedVideos = await prisma.video.findMany({
@@ -130,6 +144,9 @@ export default async function VideoPage({ params }: VideoPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* View Tracker - fires after 3 seconds */}
+      <ViewTracker videoId={video.id} />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
@@ -178,32 +195,20 @@ export default async function VideoPage({ params }: VideoPageProps) {
 
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                  <span>{formatNumber(video.viewsCount)} views</span>
+                  <span>{formatNumber(viewCount)} views</span>
                   <span>•</span>
                   <span>{formatDate(video.createdAt)}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* Like Button with Redis-backed counting */}
+                  <LikeButton
+                    videoId={video.id}
+                    initialLiked={isLiked}
+                    initialCount={likeCount}
+                  />
+                  
                   <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                      />
-                    </svg>
-                    <span className="font-medium">
-                      {formatNumber(video._count.likes)}
-                    </span>
-                  </button>
-
-                  <button className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                     <svg
                       className="w-5 h-5"
                       fill="none"
@@ -217,6 +222,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
                         d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
                       />
                     </svg>
+                    <span>Share</span>
                   </button>
                 </div>
               </div>
@@ -261,51 +267,11 @@ export default async function VideoPage({ params }: VideoPageProps) {
 
             {/* Comments Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                {video._count.comments} Comments
-              </h2>
-
-              {session ? (
-                <div className="flex gap-4 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white font-bold">
-                    {session.user.username[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <textarea
-                      placeholder="Add a comment..."
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 resize-none"
-                      rows={2}
-                    />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                        Cancel
-                      </button>
-                      <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        Comment
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Sign in to leave a comment
-                  </p>
-                  <Link
-                    href="/auth/signin"
-                    className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Sign In
-                  </Link>
-                </div>
-              )}
-
-              {/* Comment list placeholder */}
-              <div className="space-y-4">
-                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                  No comments yet. Be the first to comment!
-                </p>
-              </div>
+              <CommentSection
+                videoId={video.id}
+                initialComments={initialComments}
+                initialNextCursor={initialNextCursor}
+              />
             </div>
           </div>
 

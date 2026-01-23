@@ -1,6 +1,21 @@
+import { prisma } from '@/lib/prisma';
 import { VideoUploader } from '@/components/upload/video-uploader';
 
-export default function UploadPage() {
+export default async function UploadPage() {
+  // Fetch models and categories for selection
+  const [models, categories] = await Promise.all([
+    prisma.model.findMany({
+      where: { isVerified: true },
+      select: { id: true, stageName: true },
+      orderBy: { stageName: 'asc' },
+    }),
+    prisma.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { sortOrder: 'asc' },
+    }),
+  ]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
       <div className="container mx-auto px-4">
@@ -14,17 +29,19 @@ export default function UploadPage() {
             </p>
           </div>
           
-          <VideoUploader />
+          <VideoUploader models={models} categories={categories} />
 
           <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
-              Upload Information
+              Upload Guidelines
             </h3>
             <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+              <li>• All performers must be 18+ with valid ID verification</li>
               <li>• Maximum file size: Unlimited (resumable uploads)</li>
               <li>• Supported formats: MP4, AVI, MOV, MKV, WebM, and more</li>
               <li>• Your video will be automatically transcoded for optimal streaming</li>
               <li>• Processing time varies based on video length and resolution</li>
+              <li>• Tag models and categories for better discoverability</li>
             </ul>
           </div>
         </div>

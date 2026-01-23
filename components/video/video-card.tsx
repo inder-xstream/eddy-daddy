@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -11,6 +14,7 @@ interface VideoCardProps {
     duration: number | null;
     viewsCount: number;
     createdAt: Date;
+    orientation?: string | null;
     user: {
       username: string;
       avatarUrl: string | null;
@@ -18,7 +22,11 @@ interface VideoCardProps {
   };
 }
 
+const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'vz-xxxxx.b-cdn.net';
+
 export function VideoCard({ video }: VideoCardProps) {
+  const [isHovering, setIsHovering] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
   const formatDuration = (seconds: number | null): string => {
     if (!seconds) return '00:00';
     const mins = Math.floor(seconds / 60);
@@ -47,40 +55,58 @@ export function VideoCard({ video }: VideoCardProps) {
     return `${Math.floor(diffInSeconds / 31536000)}y ago`;
   };
 
+  // Generate preview URL from Bunny CDN
+  const getPreviewUrl = () => {
+    // If we are here, we are hovering and haven't errored yet, so try the preview URL
+    return `https://${BUNNY_PULL_ZONE}/${video.bunnyVideoId}/preview.webp`;
+  };
+
+  const getThumbnailUrl = () => {
+    return video.thumbnailUrl || `https://${BUNNY_PULL_ZONE}/${video.bunnyVideoId}/thumbnail.jpg`;
+  };
+
   return (
     <Link
       href={`/video/${video.id}`}
       className="group block bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail with Hover Preview */}
       <div className="relative aspect-video bg-gray-200 dark:bg-gray-700">
-        {video.thumbnailUrl ? (
+        {isHovering && !previewError ? (
           <Image
-            src={video.thumbnailUrl}
+            src={getPreviewUrl()}
             alt={video.title}
             fill
             className="object-cover"
+            onError={() => setPreviewError(true)}
+            unoptimized
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <Image
+            src={getThumbnailUrl()}
+            alt={video.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            unoptimized
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        )}
+
+        {/* Play icon overlay */}
+        {!isHovering && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
             <svg
-              className="w-16 h-16 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              className="w-16 h-16 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all"
+              fill="currentColor"
+              viewBox="0 0 20 20"
             >
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                clipRule="evenodd"
               />
             </svg>
           </div>
@@ -90,6 +116,13 @@ export function VideoCard({ video }: VideoCardProps) {
         {video.duration && (
           <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/80 text-white text-xs font-medium rounded">
             {formatDuration(video.duration)}
+          </div>
+        )}
+
+        {/* Orientation Badge */}
+        {video.orientation && (
+          <div className="absolute top-2 left-2 px-2 py-1 bg-blue-600/90 text-white text-xs font-medium rounded">
+            {video.orientation}
           </div>
         )}
       </div>

@@ -7,6 +7,9 @@ import { revalidatePath } from 'next/cache';
 interface VideoUpdateData {
   title?: string;
   description?: string;
+  orientation?: 'STRAIGHT' | 'GAY' | 'LESBIAN' | 'TRANS';
+  modelIds?: string[];
+  categoryIds?: string[];
 }
 
 /**
@@ -45,8 +48,40 @@ export async function finalizeUpload(
         status: 'PROCESSING',
         ...(metadata?.title && { title: metadata.title }),
         ...(metadata?.description && { description: metadata.description }),
+        ...(metadata?.orientation && { orientation: metadata.orientation }),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
+
+    // Create model associations
+    if (metadata?.modelIds && metadata.modelIds.length > 0) {
+      await prisma.videoModel.createMany({
+        data: metadata.modelIds.map((modelId) => ({
+          videoId: updatedVideo.id,
+          modelId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Create category associations
+    if (metadata?.categoryIds && metadata.categoryIds.length > 0) {
+      await prisma.videoCategory.createMany({
+        data: metadata.categoryIds.map((categoryId) => ({
+          videoId: updatedVideo.id,
+          categoryId,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     // Revalidate relevant pages
     revalidatePath('/profile');
@@ -54,7 +89,7 @@ export async function finalizeUpload(
 
     return {
       success: true,
-      videoId: updatedVideo.id,
+      video: updatedVideo,
       message: 'Upload finalized. Video is now being processed.',
     };
   } catch (error) {

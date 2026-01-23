@@ -14,9 +14,27 @@ interface UploadProgress {
 interface VideoMetadata {
   title: string;
   description: string;
+  orientation: string;
+  selectedModels: string[];
+  selectedCategories: string[];
 }
 
-export function VideoUploader() {
+interface Model {
+  id: string;
+  stageName: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface VideoUploaderProps {
+  models: Model[];
+  categories: Category[];
+}
+
+export function VideoUploader({ models, categories }: VideoUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress>({
@@ -29,9 +47,30 @@ export function VideoUploader() {
   const [metadata, setMetadata] = useState<VideoMetadata>({
     title: '',
     description: '',
+    orientation: '',
+    selectedModels: [],
+    selectedCategories: [],
   });
   
   const uploadRef = useRef<tus.Upload | null>(null);
+
+  const toggleModel = (modelId: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      selectedModels: prev.selectedModels.includes(modelId)
+        ? prev.selectedModels.filter(id => id !== modelId)
+        : [...prev.selectedModels, modelId],
+    }));
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      selectedCategories: prev.selectedCategories.includes(categoryId)
+        ? prev.selectedCategories.filter(id => id !== categoryId)
+        : [...prev.selectedCategories, categoryId],
+    }));
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -107,13 +146,22 @@ export function VideoUploader() {
             const result = await finalizeUpload(signature.videoId, {
               title: metadata.title,
               description: metadata.description || undefined,
+              orientation: metadata.orientation as any,
+              modelIds: metadata.selectedModels,
+              categoryIds: metadata.selectedCategories,
             });
 
             if (result.success) {
-              setUploadedVideoId(result.videoId || signature.videoId);
+              setUploadedVideoId(result.video?.id || signature.videoId);
               setUploading(false);
               setFile(null);
-              setMetadata({ title: '', description: '' });
+              setMetadata({
+                title: '',
+                description: '',
+                orientation: '',
+                selectedModels: [],
+                selectedCategories: [],
+              });
             } else {
               setError(result.error || 'Failed to finalize upload');
               setUploading(false);
@@ -127,8 +175,6 @@ export function VideoUploader() {
       });
 
       uploadRef.current = upload;
-
-      // Start the upload
       upload.start();
     } catch (err) {
       console.error('Upload initialization error:', err);
@@ -200,6 +246,74 @@ export function VideoUploader() {
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
+          </div>
+
+          {/* Orientation */}
+          <div>
+            <label
+              htmlFor="video-orientation"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Video Orientation
+            </label>
+            <select
+              id="video-orientation"
+              value={metadata.orientation}
+              onChange={(e) => setMetadata(prev => ({ ...prev, orientation: e.target.value }))}
+              disabled={uploading}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <option value="">Select Orientation</option>
+              <option value="LANDSCAPE">Landscape</option>
+              <option value="PORTRAIT">Portrait</option>
+              <option value="SQUARE">Square</option>
+            </select>
+          </div>
+
+          {/* Categories */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Categories
+            </label>
+            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => toggleCategory(category.id)}
+                  className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                    metadata.selectedCategories.includes(category.id)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Models */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Models
+            </label>
+            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md">
+              {models.map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => toggleModel(model.id)}
+                  className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                    metadata.selectedModels.includes(model.id)
+                      ? 'bg-pink-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {model.stageName}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

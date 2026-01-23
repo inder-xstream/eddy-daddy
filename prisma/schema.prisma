@@ -40,6 +40,7 @@ model User {
   videos       Video[]
   comments     Comment[]
   likes        Like[]
+  commentLikes CommentLike[]
   videoViews   VideoView[]    @relation("UserViews")
   subscriptions Subscription[] @relation("Subscriber") // Users this user subscribes to
   subscribers   Subscription[] @relation("Creator")    // Users subscribed to this user
@@ -92,13 +93,18 @@ model Video {
   // Add search index for full-text search
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, name: "title_search_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, name: "description_search_idx")
-  @@index([tags(ops: raw("gin_trgm_ops"))], type: Gin, name: "tags_search_idx")
+  @@index([tags(ops: raw("array_ops"))], type: Gin, name: "tags_search_idx")
+  
+  // Adult industry specific
+  orientation   VideoOrientation?
   
   // Relations
-  comments      Comment[]
-  likes         Like[]
-  videoViews    VideoView[]
-  videoTags     VideoTag[]  // Many-to-many through join table
+  comments        Comment[]
+  likes           Like[]
+  videoViews      VideoView[]
+  videoTags       VideoTag[]  // Many-to-many through join table
+  videoModels     VideoModel[]
+  videoCategories VideoCategory[]
 
   // Performance indexes
   @@index([createdAt(sort: Desc)]) // For "Newest" feed
@@ -147,15 +153,34 @@ model Comment {
   parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   Comment[] @relation("CommentReplies")
   
+  // Performance metrics
+  likesCount Int @default(0) @map("likes_count")
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  commentLikes CommentLike[]
 
   @@index([videoId, createdAt]) // For paginated comment feeds
   @@index([userId]) // For user comment history
+  @@index([parentId]) // For fetching replies
   @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
 }
 
 // ============================================================================
@@ -276,4 +301,111 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ============================================================================
+// ADULT INDUSTRY SPECIFIC MODELS
+// ============================================================================
+
+model Model {
+  id          String   @id @default(uuid()) @db.Uuid
+  stageName   String   @db.VarChar(100) @map("stage_name")
+  slug        String   @unique @db.VarChar(100)
+  avatarUrl   String?  @map("avatar_url")
+  bio         String?  @db.Text
+  
+  // Demographics
+  gender      ModelGender?
+  ethnicity   String?  @db.VarChar(50)
+  birthDate   DateTime? @map("birth_date") @db.Date
+  
+  // Stats
+  videoCount  Int      @default(0) @map("video_count")
+  viewsCount  Int      @default(0) @map("views_count")
+  
+  // Verification
+  isVerified  Boolean  @default(false) @map("is_verified")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  videoModels VideoModel[]
+  
+  @@index([slug])
+  @@index([viewsCount(sort: Desc)])
+  @@index([stageName])
+  @@map("models")
+}
+
+enum ModelGender {
+  MALE
+  FEMALE
+  TRANS_MALE
+  TRANS_FEMALE
+  NON_BINARY
+  
+  @@map("model_gender")
+}
+
+model Category {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @unique @db.VarChar(50)
+  slug         String   @unique @db.VarChar(50)
+  thumbnailUrl String?  @map("thumbnail_url")
+  description  String?  @db.Text
+  
+  // Stats
+  videoCount   Int      @default(0) @map("video_count")
+  viewsCount   Int      @default(0) @map("views_count")
+  
+  // Display settings
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  videos       VideoCategory[]
+  
+  @@index([slug])
+  @@index([viewsCount(sort: Desc)])
+  @@index([sortOrder])
+  @@map("categories")
+}
+
+model VideoModel {
+  videoId   String @map("video_id") @db.Uuid
+  modelId   String @map("model_id") @db.Uuid
+  
+  isFeatured Boolean @default(false) @map("is_featured")
+  
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  
+  @@id([videoId, modelId])
+  @@index([modelId])
+  @@map("video_models")
+}
+
+model VideoCategory {
+  videoId    String @map("video_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  
+  video    Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  @@id([videoId, categoryId])
+  @@index([categoryId])
+  @@map("video_categories")
+}
+
+enum VideoOrientation {
+  STRAIGHT
+  GAY
+  LESBIAN
+  TRANS
+  
+  @@map("video_orientation")
 }

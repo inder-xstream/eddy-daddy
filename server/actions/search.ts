@@ -51,59 +51,7 @@ export async function searchVideos(
     const offset = options?.offset || 0;
     const sortBy = options?.sortBy || 'relevance';
 
-    // Basic search using Prisma (works without pg_trgm)
-    const basicSearch = await prisma.video.findMany({
-      where: {
-        status: 'PUBLISHED',
-        OR: [
-          {
-            title: {
-              contains: searchQuery,
-              mode: 'insensitive',
-            },
-          },
-          {
-            description: {
-              contains: searchQuery,
-              mode: 'insensitive',
-            },
-          },
-          {
-            videoTags: {
-              some: {
-                tag: {
-                  name: {
-                    contains: searchQuery,
-                    mode: 'insensitive',
-                  },
-                },
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        bunnyVideoId: true,
-        title: true,
-        description: true,
-        thumbnailUrl: true,
-        duration: true,
-        viewsCount: true,
-        createdAt: true,
-        user: {
-          select: {
-            username: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: getSortOrder(sortBy),
-      take: limit,
-      skip: offset,
-    });
-
-    // Try advanced fuzzy search using raw SQL (if pg_trgm is available)
+    // 1. Try advanced fuzzy search first (using pg_trgm)
     try {
       const fuzzyResults = await prisma.$queryRaw<Array<SearchResult & { relevance: number }>>`
         SELECT 
@@ -130,9 +78,8 @@ export async function searchVideos(
           AND (
             v.title ILIKE ${`%${searchQuery}%`}
             OR v.description ILIKE ${`%${searchQuery}%`}
-            OR ${searchQuery.toLowerCase()} = ANY(v.tags)
-            OR similarity(v.title, ${searchQuery}) > 0.3
-            OR similarity(COALESCE(v.description, ''), ${searchQuery}) > 0.2
+            OR ${searchQuery} = ANY(v.tags)
+            OR similarity(v.title, ${searchQuery}) > 0.1
           )
         ORDER BY 
           ${sortBy === 'relevance' ? Prisma.sql`relevance DESC, v.views_count DESC` : 
@@ -142,7 +89,6 @@ export async function searchVideos(
         OFFSET ${offset}
       `;
 
-      // If fuzzy search returns results, use those (better quality)
       if (fuzzyResults.length > 0) {
         return {
           success: true,
@@ -151,9 +97,41 @@ export async function searchVideos(
         };
       }
     } catch (error) {
-      // If pg_trgm not available, fall back to basic search
-      console.warn('Advanced search failed, using basic search:', error);
+       // Ignore fuzzy search error and fall back to basic
+       // console.warn('Fuzzy search failed (likely missing pg_trgm):', error);
     }
+
+    // 2. Fallback: Basic Prisma search
+    const basicSearch = await prisma.video.findMany({
+      where: {
+        status: 'PUBLISHED',
+        OR: [
+          { title: { contains: searchQuery, mode: 'insensitive' } },
+          { description: { contains: searchQuery, mode: 'insensitive' } },
+          { tags: { has: searchQuery } }, // Case sensitive check for tags array
+          { videoTags: { some: { tag: { name: { contains: searchQuery, mode: 'insensitive' } } } } }
+        ],
+      },
+      select: {
+        id: true,
+        bunnyVideoId: true,
+        title: true,
+        description: true,
+        thumbnailUrl: true,
+        duration: true,
+        viewsCount: true,
+        createdAt: true,
+        user: {
+          select: {
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: getSortOrder(sortBy),
+      take: limit,
+      skip: offset,
+    });
 
     return {
       success: true,

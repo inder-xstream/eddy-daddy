@@ -3,6 +3,7 @@ import { VideoPlayer } from '@/components/video/video-player';
 import { LikeButton } from '@/components/video/like-button';
 import { ViewTracker } from '@/components/video/view-tracker';
 import CommentSection from '@/components/comments/comment-section';
+import { CommentWrapper } from '@/components/comments/comment-wrapper';
 import { RelatedVideos } from '@/components/video/related-videos';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { getLikeStatus } from '@/server/actions/engagement';
@@ -239,11 +240,13 @@ export default async function VideoPage({ params }: VideoPageProps) {
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-800">
-                <CommentSection
-                  videoId={video.id}
-                  initialComments={initialComments}
-                  initialNextCursor={initialNextCursor}
-                />
+                <CommentWrapper commentCount={video._count.comments}>
+                  <CommentSection
+                    videoId={video.id}
+                    initialComments={initialComments}
+                    initialNextCursor={initialNextCursor}
+                  />
+                </CommentWrapper>
               </div>
             </div>
           </div>

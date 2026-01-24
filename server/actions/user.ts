@@ -15,7 +15,7 @@ const profileSchema = z.object({
 export async function updateProfile(prevState: any, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: 'Unauthorized' };
+    return { success: false, error: 'Unauthorized', message: '' };
   }
 
   const rawData = {
@@ -27,7 +27,7 @@ export async function updateProfile(prevState: any, formData: FormData) {
   // Validate
   const parseResult = profileSchema.safeParse(rawData);
   if (!parseResult.success) {
-     return { success: false, error: 'Invalid data format' };
+     return { success: false, error: 'Invalid data format', message: '' };
   }
   
   const data = parseResult.data;
@@ -37,7 +37,7 @@ export async function updateProfile(prevState: any, formData: FormData) {
   });
 
   if (!user) {
-    return { success: false, error: 'User not found' };
+    return { success: false, error: 'User not found', message: '' };
   }
 
   const updateData: any = {};
@@ -56,17 +56,17 @@ export async function updateProfile(prevState: any, formData: FormData) {
   if (data.newPassword && data.newPassword.length >= 6) {
     // Check auth provider
     if (user.authProvider && user.authProvider !== 'credentials') {
-        return { success: false, error: `You are logged in via ${user.authProvider}, you cannot change password here.` };
+        return { success: false, error: `You are logged in via ${user.authProvider}, you cannot change password here.`, message: '' };
     }
 
     // Verify current password if user has one
     if (user.password) {
         if (!data.currentPassword) {
-            return { success: false, error: 'Current password is required.' };
+            return { success: false, error: 'Current password is required.', message: '' };
         }
         const isValid = await bcrypt.compare(data.currentPassword, user.password);
         if (!isValid) {
-            return { success: false, error: 'Incorrect current password.' };
+            return { success: false, error: 'Incorrect current password.', message: '' };
         }
     }
 
@@ -76,7 +76,7 @@ export async function updateProfile(prevState: any, formData: FormData) {
   }
 
   if (!hasChanges) {
-      return { success: true, message: 'No changes made' };
+      return { success: true, message: 'No changes made', error: '' };
   }
 
   try {
@@ -88,9 +88,9 @@ export async function updateProfile(prevState: any, formData: FormData) {
     revalidatePath('/profile');
     revalidatePath('/settings');
     
-    return { success: true, message: 'Profile updated successfully' };
+    return { success: true, message: 'Profile updated successfully', error: '' };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Failed to update profile';
-    return { success: false, error: msg };
+    return { success: false, error: msg, message: '' };
   }
 }

@@ -1,8 +1,8 @@
 import { searchVideos, getPopularSearches } from '@/server/actions/search';
 import { VideoCard } from '@/components/video/video-card';
 import Link from 'next/link';
-import { SearchBar } from '@/components/search/search-bar';
 import { Suspense } from 'react';
+import { AdBanner } from '@/components/ads/ad-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps) {
 async function SearchResults({ query, sortBy }: { query: string; sortBy: 'relevance' | 'recent' | 'popular' }) {
   const { results, count, error } = await searchVideos(query, {
     sortBy,
-    limit: 24,
+    limit: 30,
   });
 
   if (error) {
@@ -39,71 +39,51 @@ async function SearchResults({ query, sortBy }: { query: string; sortBy: 'releva
 
   if (results.length === 0) {
     return (
-      <div className="text-center py-12">
-        <svg
-          className="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-        <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+      <div className="text-center py-20">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-dark-800 mb-4">
+            <svg
+                className="w-8 h-8 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+            </svg>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
           No results found
         </h3>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Try adjusting your search terms or browse our{' '}
-          <Link href="/" className="text-blue-600 hover:underline">
-            trending videos
+        <p className="text-gray-600 dark:text-gray-400">
+          Try searching for something else or browse{' '}
+          <Link href="/new" className="text-xred-600 hover:underline">
+            new videos
           </Link>
+          .
         </p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {results.map((video) => (
-        <VideoCard key={video.id} video={video} />
-      ))}
-    </div>
-  );
-}
-
-
-function SortSelector({ currentSort, query }: { currentSort: string; query: string }) {
-  if (!query) return null;
-  
-  const sortOptions = [
-    { value: 'relevance', label: 'Relevance' },
-    { value: 'recent', label: 'Upload Date' },
-    { value: 'popular', label: 'View Count' },
-  ];
-
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <span className="text-gray-500 dark:text-gray-400">Sort by:</span>
-      <div className="flex space-x-2">
-        {sortOptions.map((option) => (
-          <Link
-            key={option.value}
-            href={`/search?q=${encodeURIComponent(query)}&sort=${option.value}`}
-            className={`px-3 py-1 rounded-full transition-colors ${
-              currentSort === option.value
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 font-medium'
-                : 'bg-white dark:bg-dark-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
-            } border border-gray-200 dark:border-dark-700`}
-          >
-            {option.label}
-          </Link>
+    <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+        {results.map((video) => (
+            <VideoCard key={video.id} video={video} />
         ))}
-      </div>
-    </div>
+        </div>
+        
+        {/* Pagination hint: Just showing top results for now */}
+        {count > 30 && (
+            <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                Showing top 30 results
+            </div>
+        )}
+    </>
   );
 }
 
@@ -112,89 +92,112 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const query = params.q || '';
   const sortBy = params.sort || 'relevance';
 
-  // Get popular searches if no query
-  const popularSearches = !query ? await getPopularSearches(10) : [];
+  const popularSearches = !query ? await getPopularSearches(15) : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-           <div className="w-full md:w-2/3">
-             <SearchBar initialQuery={query} />
-           </div>
-           <SortSelector currentSort={sortBy} query={query} />
+    <div className="min-h-screen bg-white dark:bg-dark-900">
+      
+      {/* Header Section */}
+      <div className="border-b border-gray-200 dark:border-dark-800 bg-gray-50 dark:bg-dark-950">
+        <div className="max-w-[1800px] mx-auto px-4 py-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white capitalize flex items-center gap-3">
+                        {query ? 'Search Results' : 'Search'}
+                        {query && (
+                             <span className="text-lg font-normal text-gray-500 dark:text-gray-400 px-3 py-1 rounded-full bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700">
+                                &quot;{query}&quot;
+                            </span>
+                        )}
+                     </h1>
+                </div>
+                
+                {query && (
+                    <div className="flex bg-gray-200 dark:bg-dark-800 p-1 rounded-lg self-start">
+                        {[
+                            { id: 'relevance', label: 'Relevance' },
+                            { id: 'recent', label: 'Date' },
+                            { id: 'popular', label: 'Views' },
+                        ].map((tab) => {
+                            const isActive = sortBy === tab.id;
+                            return (
+                                <Link
+                                    key={tab.id}
+                                    href={`/search?q=${encodeURIComponent(query)}&sort=${tab.id}`}
+                                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                                        isActive 
+                                        ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-white shadow-sm' 
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </div>
+      </div>
 
-        {/* No Query State */}
+      <div className="max-w-[1800px] mx-auto px-4 py-6">
+         {/* Top Ad */}
+         <div className="mb-8 flex justify-center">
+            <AdBanner slotId="search-top" format="leaderboard" />
+         </div>
+
+        {/* Popular Searches (Zero Query State) */}
         {!query && (
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Popular Searches
+          <div className="max-w-2xl mx-auto py-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                <svg className="w-5 h-5 text-xred-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Popular Searches
             </h2>
+            
             {popularSearches.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {popularSearches.map((search) => (
                   <Link
                     key={search}
                     href={`/search?q=${encodeURIComponent(search)}`}
-                    className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
+                    className="px-4 py-2 bg-gray-100 dark:bg-dark-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-xred-50 dark:hover:bg-xred-900/20 hover:text-xred-600 dark:hover:text-xred-400 transition-colors border border-gray-200 dark:border-dark-700 font-medium"
                   >
                     #{search}
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-600 dark:text-gray-400">
-                Start searching to discover amazing videos!
-              </p>
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                     <p>Type in the search bar above to find videos.</p>
+                </div>
             )}
+            
+            <div className="mt-12 text-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Or browse by:</h3>
+                <div className="flex justify-center gap-4">
+                     <Link href="/new" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Newest Videos</Link>
+                     <Link href="/best" className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Top Rated</Link>
+                </div>
+            </div>
           </div>
         )}
 
-        {/* Search Results */}
+        {/* Results */}
         {query && (
-          <>
-            {/* Results Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Search Results
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Searching for &quot;{query}&quot;
-                </p>
-              </div>
-
-              {/* Sort Options - Client Component */}
-              <form method="get" className="flex items-center gap-2">
-                <input type="hidden" name="q" value={query} />
-                <label htmlFor="sort" className="text-sm text-gray-600 dark:text-gray-400">
-                  Sort by:
-                </label>
-                <select
-                  id="sort"
-                  name="sort"
-                  defaultValue={sortBy}
-                  onChange={(e) => e.currentTarget.form?.submit()}
-                  className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="relevance">Relevance</option>
-                  <option value="recent">Recent</option>
-                  <option value="popular">Popular</option>
-                </select>
-              </form>
-            </div>
-
-            {/* Results Grid */}
             <Suspense fallback={
-              <div className="flex justify-center py-12">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-              </div>
+                <div className="flex justify-center py-20">
+                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-xred-600"></div>
+                </div>
             }>
               <SearchResults query={query} sortBy={sortBy} />
             </Suspense>
-          </>
         )}
+        
+        <div className="mt-8 flex justify-center">
+            <AdBanner slotId="search-bottom" format="leaderboard" />
+         </div>
       </div>
     </div>
   );

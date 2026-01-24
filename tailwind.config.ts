@@ -19,9 +19,11 @@ export default {
           700: "#9B0D12",
         },
         dark: {
+          950: "#0A0A0A", // Very Dark
           900: "#121212", // OLED-friendly Dark
           800: "#1E1E1E", // Card BG
           700: "#2C2C2C", // Hover
+          600: "#3D3D3D", // Component Interaction
         }
       },
       aspectRatio: {

@@ -7,6 +7,12 @@ import { ReactNode } from 'react';
 
 export const dynamic = 'force-dynamic';
 
+// Configuration for ad injection positions
+const AD_POSITIONS = {
+   LEADERBOARD: 7, // 8th position (index 7)
+   NATIVE: 19      // 20th position (index 19)
+};
+
 export default async function HomePage() {
   // Fetch published videos with creator info
   const videos = await prisma.video.findMany({
@@ -45,7 +51,7 @@ export default async function HomePage() {
       );
 
       // Inject Leaderboard after 8th video (approx 2 rows)
-      if (index === 7) {
+      if (index === AD_POSITIONS.LEADERBOARD) {
         items.push(
           <div key="ad-leaderboard-1" className="col-span-2 md:col-span-3 lg:col-span-4 flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50 rounded-lg">
              <AdBanner slotId="home-native-1" format="leaderboard" />
@@ -54,7 +60,7 @@ export default async function HomePage() {
       }
       
       // Inject Native/Rectangle ad after 20th video
-       if (index === 19) {
+       if (index === AD_POSITIONS.NATIVE) {
         items.push(
           <div key="ad-native-1" className="col-span-1 min-h-[200px] flex items-center justify-center">
              <AdBanner slotId="home-native-2" format="native" className="h-full w-full" />

@@ -16,6 +16,7 @@ interface VideoCardProps {
     createdAt: Date | string;
     orientation?: string | null;
     previewUrl?: string | null;
+    resolutions?: string[];
     user: {
       username: string;
       avatarUrl: string | null;
@@ -68,6 +69,19 @@ export function VideoCard({ video }: VideoCardProps) {
     return video.thumbnailUrl || `https://${BUNNY_PULL_ZONE}/${video.bunnyVideoId}/thumbnail.jpg`;
   };
 
+  const getVideoBadge = () => {
+    if (video.resolutions && video.resolutions.length > 0) {
+      if (video.resolutions.some(r => r.includes('4K') || r.includes('2160p'))) return '4K';
+      if (video.resolutions.some(r => r.includes('2K') || r.includes('1440p'))) return '2K';
+      if (video.resolutions.some(r => r.includes('1080p'))) return 'HD';
+      if (video.resolutions.some(r => r.includes('720p'))) return 'HD';
+    }
+    // Fallback if resolutions array is empty but it's new content
+    return 'HD'; 
+  };
+  
+  const badge = getVideoBadge();
+
   return (
     <Link 
       href={`/video/${video.id}`}
@@ -97,9 +111,11 @@ export function VideoCard({ video }: VideoCardProps) {
         )}
 
         {/* Quality Badge (Top Right) */}
-        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-xred-500/90 text-white text-[10px] font-bold rounded uppercase tracking-wider">
-          HD
-        </div>
+        {badge && (
+          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-xred-500/90 text-white text-[10px] font-bold rounded uppercase tracking-wider">
+            {badge}
+          </div>
+        )}
 
         {/* Duration Badge (Bottom Right) */}
         <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-xs font-medium rounded">

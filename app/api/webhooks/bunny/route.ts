@@ -1,276 +1,115 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-/**
- * Bunny Stream Webhook Handler
- * 
- * TESTING LOCALLY:
- * 1. Install ngrok: `npm install -g ngrok`
- * 2. Start your dev server: `npm run dev`
- * 3. Expose localhost: `ngrok http 3000`
- * 4. Copy the ngrok URL (e.g., https://abc123.ngrok.io)
- * 5. In Bunny Stream dashboard:
- *    - Go to your Video Library > Webhooks
- *    - Add webhook URL: https://abc123.ngrok.io/api/webhooks/bunny
- *    - Select events: "Video Encoded" and "Video Upload Failed"
- * 6. Upload a test video and watch your local logs
- * 
- * PRODUCTION:
- * - Set BUNNY_WEBHOOK_SECRET in your environment variables
- * - Configure the webhook URL in Bunny dashboard: https://yourdomain.com/api/webhooks/bunny
- */
-
-const BUNNY_WEBHOOK_SECRET = process.env.BUNNY_WEBHOOK_SECRET;
-
-interface BunnyWebhookPayload {
-  VideoGuid: string;
-  Status: number;
-  VideoLibraryId: number;
-  Length?: number; // Duration in seconds
-  ThumbnailFileName?: string;
-  EncodeProgress?: number;
-  // Additional fields that might be present
-  Title?: string;
-  Width?: number;
-  Height?: number;
-  AvailableResolutions?: string;
-}
-
-/**
- * Bunny Stream Status Codes:
- * 0 - Created
- * 1 - Uploaded
- * 2 - Processing
- * 3 - Encoding finished (SUCCESS)
- * 4 - Resolution finished
- * 5 - Error/Failed
- */
-enum BunnyStatus {
-  CREATED = 0,
-  UPLOADED = 1,
-  PROCESSING = 2,
-  FINISHED = 3,
-  RESOLUTION_FINISHED = 4,
-  FAILED = 5,
-}
-
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    // Security: Verify the request comes from Bunny
-    const bunnySignature = request.headers.get('x-bunny-signature');
-    const bunnySecret = request.headers.get('x-bunny-secret');
+    const body = await req.json();
     
-    // If webhook secret is configured, validate it
-    // if (BUNNY_WEBHOOK_SECRET) {
-    //   if (bunnySecret !== BUNNY_WEBHOOK_SECRET) {
-    //     console.error('Invalid Bunny webhook secret');
-    //     return NextResponse.json(
-    //       { error: 'Unauthorized' },
-    //       { status: 401 }
-    //     );
-    //   }
-    // }
-
-    // Parse webhook payload
-    const payload: BunnyWebhookPayload = await request.json();
-
-    console.log('Bunny webhook received:', {
-      videoGuid: payload.VideoGuid,
-      status: payload.Status,
-      libraryId: payload.VideoLibraryId,
-    });
-
-    // Validate required fields
-    if (!payload.VideoGuid || payload.Status === undefined) {
-      console.error('Invalid webhook payload: missing VideoGuid or Status');
-      return NextResponse.json(
-        { error: 'Invalid payload' },
-        { status: 400 }
-      );
+    // 1. Basic Validation
+    if (!body.VideoGuid || typeof body.Status === 'undefined') {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // Find the video in our database
-    const video = await prisma.video.findUnique({
-      where: { bunnyVideoId: payload.VideoGuid },
-      select: { id: true, title: true, status: true },
-    });
+    const { VideoGuid, Status, VideoLibraryId } = body;
+    const PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE;
+    const API_KEY = process.env.BUNNY_API_KEY;
 
-    if (!video) {
-      console.warn(`Video not found in database: ${payload.VideoGuid}`);
-      // Return 200 to acknowledge receipt (video might not be in DB yet)
-      return NextResponse.json(
-        { message: 'Video not found, but webhook acknowledged' },
-        { status: 200 }
-      );
+    // --- HANDLE FINISHED STATUS (3) ---
+    if (Status === 3) {
+      // Initialize with payload data (Optimization: Avoid API call if possible)
+      let duration = body.Length || 0;
+      let resolutions = body.AvailableResolutions ? body.AvailableResolutions.split(',') : [];
+
+      // 2. Fallback: Call API only if data is missing or invalid
+      if (!duration || resolutions.length === 0) {
+        try {
+          console.log(`📡 Metadata missing in webhook, fetching from API for ${VideoGuid}...`);
+          const response = await fetch(
+            `https://video.bunnycdn.com/library/${VideoLibraryId}/videos/${VideoGuid}`,
+            {
+              method: "GET",
+              headers: {
+                "AccessKey": API_KEY!, // Use Non-Null assertion cautiously
+                "Accept": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            const videoDetails = await response.json();
+            
+            // Update if we found better data
+            if (!duration) duration = videoDetails.length || 0;
+            if (resolutions.length === 0 && videoDetails.availableResolutions) {
+               resolutions = videoDetails.availableResolutions.split(',');
+            }
+            
+            console.log(`✅ Fetched Metadata: Duration=${duration}s, Resolutions=${resolutions.length}`);
+          } else {
+            console.error(`⚠️ Failed to fetch metadata from Bunny API: ${response.status}`);
+          }
+        } catch (err) {
+          console.error("⚠️ Error fetching metadata:", err);
+          // Don't throw here; allow partial update
+        }
+      }
+
+      // 3. Construct URLs
+      const thumbnailUrl = `https://${PULL_ZONE}/${VideoGuid}/thumbnail.jpg`;
+      const previewUrl = `https://${PULL_ZONE}/${VideoGuid}/preview.webp`;
+      const hlsUrl = `https://${PULL_ZONE}/${VideoGuid}/playlist.m3u8`;
+
+      // 4. Update DB (Safely)
+      try {
+        await prisma.video.update({
+          where: { bunnyVideoId: VideoGuid },
+          data: {
+            status: "PUBLISHED",
+            duration: duration,
+            thumbnailUrl: thumbnailUrl,
+            previewUrl: previewUrl,
+            hlsUrl: hlsUrl,
+            resolutions: resolutions, // Important for player quality selector
+          },
+        });
+        console.log(`✅ Published Video: ${VideoGuid}`);
+      } catch (dbError) {
+        // If RecordNotFound, it means video was deleted during processing.
+        console.warn(`⚠️ Video record not found for update (likely deleted): ${VideoGuid}`);
+        // Return 200 to stop Bunny from retrying endlessly
+        return NextResponse.json({ success: true, message: "Video not found, skipped" }); 
+      }
+    } 
+    
+    // --- HANDLE PROCESSING / UPLOADING ---
+    else if (Status === 0 || Status === 1 || Status === 7) {
+       // Only update if not already publishing (Race condition protection)
+       try {
+        await prisma.video.updateMany({
+          where: { 
+            bunnyVideoId: VideoGuid, 
+            status: { not: "PUBLISHED" } // Don't revert a published video to processing
+          },
+          data: { status: "PROCESSING" },
+        });
+       } catch (e) {
+         // Ignore
+       }
     }
 
-    // Handle different status codes
-    switch (payload.Status) {
-      case BunnyStatus.FINISHED:
-        // Video encoding completed successfully
-        await handleVideoFinished(video.id, payload);
-        break;
-
-      case BunnyStatus.FAILED:
-        // Video encoding failed
-        await handleVideoFailed(video.id, payload);
-        break;
-
-      case BunnyStatus.PROCESSING:
-        // Video is being processed
-        await handleVideoProcessing(video.id, payload);
-        break;
-
-      case BunnyStatus.UPLOADED:
-        // Video has been uploaded and is queued for processing
-        await handleVideoUploaded(video.id);
-        break;
-
-      default:
-        console.log(`Unhandled Bunny status: ${payload.Status} for video ${video.id}`);
+    // --- HANDLE FAILURE ---
+    else if (Status === 4) { 
+        await prisma.video.update({
+          where: { bunnyVideoId: VideoGuid },
+          data: { status: "FAILED" },
+        });
+        console.error(`❌ Video Failed: ${VideoGuid}`);
     }
 
-    // Log the webhook event (optional: store in a WebhookLog table)
-    console.log(`Webhook processed successfully for video ${video.title} (${video.id})`);
-
-    return NextResponse.json(
-      { 
-        success: true,
-        message: 'Webhook processed',
-        videoId: video.id,
-      },
-      { status: 200 }
-    );
-
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Bunny webhook error:', error);
-    
-    // Return 200 to prevent Bunny from retrying on our internal errors
-    // In production, you might want to return 500 for retryable errors
-    return NextResponse.json(
-      { 
-        error: 'Webhook processing failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 200 }
-    );
+    console.error("🔥 Webhook Error:", error);
+    // Return 500 to signal Bunny to retry later
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-}
-
-/**
- * Handle successfully encoded video
- */
-async function handleVideoFinished(
-  videoId: string,
-  payload: BunnyWebhookPayload
-) {
-  const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME;
-  // const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
-
-  const updateData: any = {
-    status: 'PUBLISHED',
-    publishedAt: new Date(),
-  };
-
-  // Update duration if provided
-  if (payload.Length) {
-    updateData.duration = Math.floor(payload.Length);
-  }
-
-  // Generate HLS URL
-  if (BUNNY_CDN_HOSTNAME) {
-    updateData.hlsUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/playlist.m3u8`;
-    // Generate Preview WebP URL (Animated Preview)
-    updateData.previewUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/preview.webp`;
-  }
-
-  // Generate thumbnail URL if available
-  if (payload.ThumbnailFileName && BUNNY_CDN_HOSTNAME) {
-    updateData.thumbnailUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/${payload.ThumbnailFileName}`;
-  }
-
-  // Store Available Resolutions
-  if (payload.AvailableResolutions) {
-    // payload.AvailableResolutions comes as "240p,360p,720p"
-    updateData.resolutions = payload.AvailableResolutions.split(',').map((r: string) => r.trim());
-  }
-
-  await prisma.video.update({
-    where: { id: videoId },
-    data: updateData,
-  });
-
-  console.log(`Video ${videoId} published successfully`, {
-    duration: updateData.duration,
-    hlsUrl: updateData.hlsUrl,
-    resolutions: updateData.resolutions,
-  });
-}
-
-/**
- * Handle failed video encoding
- */
-async function handleVideoFailed(
-  videoId: string,
-  payload: BunnyWebhookPayload
-) {
-  await prisma.video.update({
-    where: { id: videoId },
-    data: {
-      status: 'FAILED',
-      failureReason: `Bunny Stream encoding failed (Status: ${payload.Status})`,
-    },
-  });
-
-  console.error(`Video ${videoId} encoding failed`);
-
-  // TODO: Send notification to video owner
-  // TODO: Optionally retry or delete the video
-}
-
-/**
- * Handle video in processing state
- */
-async function handleVideoProcessing(
-  videoId: string,
-  payload: BunnyWebhookPayload
-) {
-  const updateData: any = {
-    status: 'PROCESSING',
-  };
-
-  // Optionally store encoding progress
-  if (payload.EncodeProgress !== undefined) {
-    console.log(
-      `Video ${videoId} encoding progress: ${payload.EncodeProgress}%`
-    );
-  }
-
-  await prisma.video.update({
-    where: { id: videoId },
-    data: updateData,
-  });
-}
-
-/**
- * Handle uploaded video (queued for processing)
- */
-async function handleVideoUploaded(videoId: string) {
-  await prisma.video.update({
-    where: { id: videoId },
-    data: {
-      status: 'PROCESSING',
-    },
-  });
-
-  console.log(`Video ${videoId} uploaded and queued for processing`);
-}
-
-// Optional: Add GET handler for health check
-export async function GET() {
-  return NextResponse.json({
-    status: 'healthy',
-    endpoint: 'bunny-webhook',
-    timestamp: new Date().toISOString(),
-  });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateVideoStatus, deleteVideo } from '@/server/actions/video';
 import Link from 'next/link';
 
@@ -24,6 +24,10 @@ interface VideoListProps {
 export function VideoList({ initialVideos, currentPage, totalPages }: VideoListProps) {
   const [videos, setVideos] = useState<Video[]>(initialVideos);
   const [loading, setLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    setVideos(initialVideos);
+  }, [initialVideos]);
 
   const handleStatusChange = async (videoId: string, newStatus: string) => {
     setLoading(videoId);
@@ -109,6 +113,30 @@ export function VideoList({ initialVideos, currentPage, totalPages }: VideoListP
           </tbody>
         </table>
       </div>
+      
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center mt-6 gap-4">
+          <Link
+            href={`/admin/videos?page=${currentPage - 1}`}
+            className={`px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-700 ${
+              currentPage <= 1 ? 'pointer-events-none opacity-50' : ''
+            }`}
+          >
+            Previous
+          </Link>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Link
+            href={`/admin/videos?page=${currentPage + 1}`}
+            className={`px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-700 ${
+              currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''
+            }`}
+          >
+            Next
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

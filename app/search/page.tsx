@@ -75,6 +75,38 @@ async function SearchResults({ query, sortBy }: { query: string; sortBy: 'releva
   );
 }
 
+
+function SortSelector({ currentSort, query }: { currentSort: string; query: string }) {
+  if (!query) return null;
+  
+  const sortOptions = [
+    { value: 'relevance', label: 'Relevance' },
+    { value: 'recent', label: 'Upload Date' },
+    { value: 'popular', label: 'View Count' },
+  ];
+
+  return (
+    <div className="flex items-center space-x-2 text-sm">
+      <span className="text-gray-500 dark:text-gray-400">Sort by:</span>
+      <div className="flex space-x-2">
+        {sortOptions.map((option) => (
+          <Link
+            key={option.value}
+            href={`/search?q=${encodeURIComponent(query)}&sort=${option.value}`}
+            className={`px-3 py-1 rounded-full transition-colors ${
+              currentSort === option.value
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 font-medium'
+                : 'bg-white dark:bg-dark-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
+            } border border-gray-200 dark:border-dark-700`}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = params.q || '';
@@ -86,9 +118,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Bar */}
-        <div className="mb-8">
-          <SearchBar initialQuery={query} />
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+           <div className="w-full md:w-2/3">
+             <SearchBar initialQuery={query} />
+           </div>
+           <SortSelector currentSort={sortBy} query={query} />
         </div>
 
         {/* No Query State */}

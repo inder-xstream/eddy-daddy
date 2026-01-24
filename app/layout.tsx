@@ -8,7 +8,9 @@ import './globals.css';
 import { SidebarProvider } from '@/components/providers/sidebar-provider';
 import { AuthModalProvider } from '@/components/providers/auth-modal-provider';
 import { AuthModal } from '@/components/auth/auth-modal';
+import { AuthUrlListener } from '@/components/auth/auth-url-listener';
 import { Footer } from '@/components/layout/footer';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'XStream - Adult Video Platform',
@@ -41,7 +43,10 @@ export default function RootLayout({
               <AuthModalProvider>
                 <AgeGateModal />
                 <Navbar />
-                <AuthModal />
+                <Suspense fallback={null}>
+                  <AuthUrlListener />
+                  <AuthModal />
+                </Suspense>
                 <div className="flex flex-col min-h-screen">
                   <div className="flex flex-1">
                     <CategoriesSidebar />

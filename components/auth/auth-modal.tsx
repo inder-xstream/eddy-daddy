@@ -3,13 +3,16 @@
 import { useAuthModal } from '@/components/providers/auth-modal-provider';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from  'next/navigation';
+import { useSearchParams, useRouter } from  'next/navigation';
 import { registerUser } from '@/server/actions/auth';
 import Link from 'next/link';
 
 export function AuthModal() {
   const { isOpen, view, openModal, closeModal } = useAuthModal();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -46,7 +49,11 @@ export function AuthModal() {
         setError('Invalid credentials');
       } else if (result?.ok) {
         closeModal();
-        router.refresh();
+        if (callbackUrl) {
+          router.push(callbackUrl);
+        } else {
+          router.refresh();
+        }
       }
     } catch (error) {
       setError('An unexpected error occurred');

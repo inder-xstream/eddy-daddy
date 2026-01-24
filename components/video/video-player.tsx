@@ -17,6 +17,9 @@ interface QualityLevel {
   label: string; 
 }
 
+// Playback speeds array
+const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
 export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUrl }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,24 +36,60 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [buffered, setBuffered] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   
-  // Quality State
+  // Menus State
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState<number>(-1); // -1 = Auto
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   // Ad State
   const [error, setError] = useState<string | null>(null);
-  const [isAdPlaying, setIsAdPlaying] = useState(false); // Ad logic disabled for this MVP replacement to focus on player controls
-  const [adTimeLeft, setAdTimeLeft] = useState(0);
 
-  // Initial Ad Check (Simplified)
+  // Close menus when clicking outside
   useEffect(() => {
-     if (vastTagUrl) {
-       // Placeholder: In real app, trigger VAST logic here
-       // For now, we skip ad logic to ensure the custom player works first
-     }
-  }, [vastTagUrl]);
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.menu-container')) {
+        setShowQualityMenu(false);
+        setShowSpeedMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      switch(e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'ArrowRight':
+          skip(10);
+          break;
+        case 'ArrowLeft':
+          skip(-10);
+          break;
+        case 'f':
+          toggleFullscreen();
+          break;
+        case 'm':
+          toggleVolume();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, isMuted]); // Dependencies for toggle functions
 
   // Setup HLS
   useEffect(() => {
@@ -81,8 +120,9 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
+        // Only handle fatal errors differently if needed, simple logging for now
         if (data.fatal) {
-           setError('Error loading video stream');
+           setError('Stream error');
            hls.destroy();
         }
       });
@@ -105,6 +145,20 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
     }
   };
 
+  const handleSpeedChange = (speed: number) => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+      setPlaybackSpeed(speed);
+      setShowSpeedMenu(false);
+    }
+  };
+
+  const skip = (seconds: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime += seconds;
+    }
+  };
+
   // Video Events
   const onTimeUpdate = () => {
     if (videoRef.current) {
@@ -119,18 +173,21 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
 
   const togglePlay = () => {
     if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause();
-      else videoRef.current.play();
-      setIsPlaying(!isPlaying);
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
     }
   };
 
   const toggleVolume = () => {
     if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-      if (!isMuted) setVolume(0);
-      else setVolume(1);
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+      setVolume(videoRef.current.muted ? 0 : videoRef.current.volume || 1);
     }
   };
 
@@ -180,6 +237,7 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
       className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group select-none"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setShowControls(false)}
+      onDoubleClick={() => toggleFullscreen()} // Double click to fullscreen
     >
       <video
         ref={videoRef}
@@ -237,7 +295,7 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Play/Pause */}
-            <button onClick={togglePlay} className="text-white hover:text-xred-500 transition-colors">
+            <button onClick={togglePlay} className="text-white hover:text-xred-500 transition-colors" title={isPlaying ? "Pause (k)" : "Play (k)"}>
               {isPlaying ? (
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
               ) : (
@@ -245,9 +303,17 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
               )}
             </button>
 
+             {/* Skip Buttons */}
+            <button onClick={() => skip(-10)} className="text-white hover:text-gray-300 hidden sm:block" title="Rewind 10s (Left Arrow)">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.5 8h-6.75M8 6l-2.25 2L8 10M12.5 16h6.75M16 14l2.25 2L16 18" transform="scale(-1, 1) translate(-24, 0)" /><text x="8" y="15" fontSize="8" fill="currentColor" textAnchor="middle">-10</text></svg>
+            </button>
+            <button onClick={() => skip(10)} className="text-white hover:text-gray-300 hidden sm:block" title="Forward 10s (Right Arrow)">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.5 8h6.75M16 6l2.25 2L16 10M11.5 16h-6.75M8 14l-2.25 2L8 18" /><text x="16" y="15" fontSize="8" fill="currentColor" textAnchor="middle">10</text></svg>
+            </button>
+
             {/* Volume */}
             <div className="flex items-center gap-2 group/volume">
-               <button onClick={toggleVolume} className="text-white hover:text-gray-300">
+               <button onClick={toggleVolume} className="text-white hover:text-gray-300" title={isMuted ? "Unmute (m)" : "Mute (m)"}>
                   {isMuted || volume === 0 ? (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
                   ) : (
@@ -272,19 +338,44 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
           </div>
 
           <div className="flex items-center gap-4">
+             {/* Speed Selector */}
+             <div className="relative menu-container">
+               <button 
+                  onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowQualityMenu(false); }}
+                  className="text-white hover:text-xred-500 text-sm font-semibold w-8 text-center"
+                  title="Playback Speed"
+               >
+                  {playbackSpeed}x
+               </button>
+               {showSpeedMenu && (
+                 <div className="absolute bottom-full right-0 mb-2 bg-black/90 border border-gray-700 rounded-lg overflow-hidden min-w-[80px] shadow-xl z-30">
+                    {PLAYBACK_SPEEDS.map((speed) => (
+                      <button
+                         key={speed}
+                         onClick={() => handleSpeedChange(speed)}
+                         className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${playbackSpeed === speed ? 'text-xred-500 font-bold' : 'text-gray-300'}`}
+                      >
+                        {speed}x
+                      </button>
+                    ))}
+                 </div>
+               )}
+             </div>
+
              {/* Quality Selector */}
              {qualities.length > 0 && (
-               <div className="relative">
+               <div className="relative menu-container">
                  <button 
-                    onClick={() => setShowQualityMenu(!showQualityMenu)}
+                    onClick={() => { setShowQualityMenu(!showQualityMenu); setShowSpeedMenu(false); }}
                     className="flex items-center gap-1 text-white hover:text-xred-500 text-sm font-semibold border border-white/20 px-2 py-0.5 rounded"
+                    title="Quality"
                  >
                     {currentQuality === -1 ? 'Auto' : qualities.find(q => q.levelIndex === currentQuality)?.label}
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                  </button>
                  
                  {showQualityMenu && (
-                   <div className="absolute bottom-full right-0 mb-2 bg-black/90 border border-gray-700 rounded-lg overflow-hidden min-w-[120px] shadow-xl">
+                   <div className="absolute bottom-full right-0 mb-2 bg-black/90 border border-gray-700 rounded-lg overflow-hidden min-w-[120px] shadow-xl z-30">
                       {qualities.map((q) => (
                         <button
                            key={q.levelIndex}
@@ -300,7 +391,7 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUr
              )}
 
              {/* Fullscreen */}
-             <button onClick={toggleFullscreen} className="text-white hover:text-xred-500 transition-colors">
+             <button onClick={toggleFullscreen} className="text-white hover:text-xred-500 transition-colors" title="Fullscreen (f)">
                {isFullscreen ? (
                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5z"/></svg>
                ) : (

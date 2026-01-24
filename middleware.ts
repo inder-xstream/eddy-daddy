@@ -12,7 +12,8 @@ export async function middleware(request: NextRequest) {
 
   // If user is not authenticated and trying to access protected routes
   if (!token && pathname !== '/auth/signin') {
-    const signInUrl = new URL('/auth/signin', request.url);
+    const signInUrl = new URL('/', request.url);
+    signInUrl.searchParams.set('auth', 'signin');
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);
   }

@@ -4,6 +4,7 @@ import { LikeButton } from '@/components/video/like-button';
 import { ViewTracker } from '@/components/video/view-tracker';
 import CommentSection from '@/components/comments/comment-section';
 import { RelatedVideos } from '@/components/video/related-videos';
+import { AdBanner } from '@/components/ads/ad-banner';
 import { getLikeStatus } from '@/server/actions/engagement';
 import { getViewCount } from '@/server/actions/view';
 import { getComments } from '@/server/actions/comment';
@@ -40,7 +41,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
   const { id } = await params;
   const session = await auth();
 
-  // Fetch video with creator info
+  // Fetch video with creator info, including TAGS
   const video = await prisma.video.findUnique({
     where: { id },
     include: {
@@ -62,6 +63,11 @@ export default async function VideoPage({ params }: VideoPageProps) {
           comments: true,
         },
       },
+      videoTags: {
+        include: {
+          tag: true
+        }
+      }
     },
   });
 
@@ -95,7 +101,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
   const { isLiked, likeCount } = await getLikeStatus(video.id);
   const viewCount = await getViewCount(video.id);
 
-  // Fetch initial comments (top-level only, 10 at a time)
+  // Fetch initial comments
   const commentsResult = await getComments({
     videoId: video.id,
     parentId: null,
@@ -121,20 +127,23 @@ export default async function VideoPage({ params }: VideoPageProps) {
 
   return (
     <div className="min-h-screen bg-white dark:bg-dark-900">
-      {/* View Tracker - fires after 3 seconds */}
       <ViewTracker videoId={video.id} />
       
+      {/* Top Banner Ad - Leaderboard */}
+      <div className="flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50">
+         <AdBanner slotId="video-top-leaderboard" format="leaderboard" />
+      </div>
+
       <div className="max-w-[1800px] mx-auto px-0 md:px-4 py-0 md:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main Content: Player + Info (9 cols) */}
           <div className="lg:col-span-9 space-y-4">
-            {/* Player Container */}
             <div className={`w-full ${!video.hlsUrl ? 'aspect-video bg-gray-900' : ''} sm:rounded-lg overflow-hidden relative z-10`}>
               {video.hlsUrl ? (
                 <VideoPlayer 
                   hlsUrl={video.hlsUrl} 
                   thumbnailUrl={video.thumbnailUrl} 
                   title={video.title}
+                  vastTagUrl="https://example.com/vast.xml" 
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -145,15 +154,18 @@ export default async function VideoPage({ params }: VideoPageProps) {
                 </div>
               )}
             </div>
+            
+            <div className="my-2 hidden md:block">
+                <AdBanner slotId="video-under-player" format="leaderboard" className="w-full" />
+            </div>
 
-            {/* Video Info */}
             <div className="px-4 sm:px-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 {video.title}
               </h1>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-200 dark:border-dark-800 gap-4">
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                   <span className="font-medium text-gray-900 dark:text-white mr-2">
                     {formatNumber(viewCount)} views
                   </span>
@@ -173,7 +185,21 @@ export default async function VideoPage({ params }: VideoPageProps) {
                 </div>
               </div>
 
-              {/* Creator Info & Description */}
+               {/* TAGS Display */}
+               {video.videoTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 py-3">
+                  {video.videoTags.map(({ tag }) => (
+                    <Link 
+                      key={tag.id} 
+                      href={`/tag/${tag.slug}`}
+                      className="text-xs font-medium px-3 py-1 rounded-full bg-gray-100 dark:bg-dark-800 text-gray-600 dark:text-gray-300 hover:bg-xred-50 dark:hover:bg-xred-900/20 hover:text-xred-600 dark:hover:text-xred-400 transition-colors border border-gray-200 dark:border-dark-700"
+                    >
+                      #{tag.name}
+                    </Link>
+                  ))}
+                </div>
+               )}
+
               <div className="py-4 flex gap-4">
                 <Link href={`/profile/${video.user.username}`} className="flex-shrink-0">
                   {video.user.avatarUrl ? (
@@ -212,7 +238,6 @@ export default async function VideoPage({ params }: VideoPageProps) {
                 </div>
               </div>
 
-              {/* Comments Section */}
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-800">
                 <CommentSection
                   videoId={video.id}
@@ -223,10 +248,13 @@ export default async function VideoPage({ params }: VideoPageProps) {
             </div>
           </div>
 
-          {/* Sidebar: Related Videos & Ads (3 cols) */}
           <div className="lg:col-span-3">
-             <div className="px-4 sm:px-0">
+             <div className="px-4 sm:px-0 space-y-6">
+                <AdBanner slotId="video-sidebar-top" format="rectangle" />
                 <RelatedVideos videoId={video.id} />
+                 <div className="sticky top-24">
+                   <AdBanner slotId="video-sidebar-bottom" format="rectangle" />
+                 </div>
              </div>
           </div>
         </div>

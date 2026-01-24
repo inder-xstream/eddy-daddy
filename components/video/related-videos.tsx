@@ -10,6 +10,8 @@ export async function RelatedVideos({ videoId }: RelatedVideosProps) {
   const currentVideo = await prisma.video.findUnique({
     where: { id: videoId },
     select: {
+      tags: true, 
+      userId: true,
       videoCategories: {
         select: { categoryId: true }
       }
@@ -17,25 +19,35 @@ export async function RelatedVideos({ videoId }: RelatedVideosProps) {
   });
 
   const categoryIds = currentVideo?.videoCategories.map(vc => vc.categoryId) || [];
+  const tags = currentVideo?.tags || [];
+  const authorId = currentVideo?.userId;
 
   // 2. Fetch related
+  // Priority: 
+  // 1. Same Author + Same Tags/Category
+  // 2. Same Tags
+  // 3. Same Category
+  // We can simulate this with a single query sorting by multiple criteria or score, 
+  // but for simplicity in Prisma, we'll fetch broad matches and sort by views/recency.
   const relatedVideos = await prisma.video.findMany({
     where: {
       status: 'PUBLISHED',
       id: { not: videoId }, // Exclude current
-      videoCategories: {
-        some: {
-          categoryId: { in: categoryIds }
-        }
-      }
+      OR: [
+        { videoCategories: { some: { categoryId: { in: categoryIds } } } },
+        { tags: { hasSome: tags } },
+        { userId: authorId }
+      ]
     },
-    orderBy: {
-      viewsCount: 'desc' // Sort by popularity
-    },
-    take: 8,
+    orderBy: [
+       // Simple mix ranking: Newest first within related cluster
+       { viewsCount: 'desc' },
+       { createdAt: 'desc' }
+    ],
+    take: 12,
     include: {
       user: {
-        select: { username: true, avatarUrl: true } // Added avatarUrl to match what VideoCard might expect or ignore
+        select: { username: true, avatarUrl: true } 
       }
     }
   });

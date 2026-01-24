@@ -75,7 +75,9 @@ model Video {
   description   String?     @db.Text
   duration      Int?        // Duration in seconds (populated after transcoding)
   thumbnailUrl  String?     @map("thumbnail_url") // Bunny CDN thumbnail URL
+  previewUrl    String?     @map("preview_url") // WebP animated preview
   hlsUrl        String?     @map("hls_url") // HLS manifest URL (derived from bunnyVideoId, cached for performance)
+  resolutions   String[]    @default([])
   
   // Processing workflow
   status        VideoStatus @default(PENDING)

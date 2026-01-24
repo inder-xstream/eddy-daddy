@@ -165,7 +165,7 @@ async function handleVideoFinished(
   payload: BunnyWebhookPayload
 ) {
   const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME;
-  const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
+  // const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
 
   const updateData: any = {
     status: 'PUBLISHED',
@@ -180,11 +180,19 @@ async function handleVideoFinished(
   // Generate HLS URL
   if (BUNNY_CDN_HOSTNAME) {
     updateData.hlsUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/playlist.m3u8`;
+    // Generate Preview WebP URL (Animated Preview)
+    updateData.previewUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/preview.webp`;
   }
 
   // Generate thumbnail URL if available
   if (payload.ThumbnailFileName && BUNNY_CDN_HOSTNAME) {
     updateData.thumbnailUrl = `https://${BUNNY_CDN_HOSTNAME}/${payload.VideoGuid}/${payload.ThumbnailFileName}`;
+  }
+
+  // Store Available Resolutions
+  if (payload.AvailableResolutions) {
+    // payload.AvailableResolutions comes as "240p,360p,720p"
+    updateData.resolutions = payload.AvailableResolutions.split(',').map((r: string) => r.trim());
   }
 
   await prisma.video.update({
@@ -195,6 +203,7 @@ async function handleVideoFinished(
   console.log(`Video ${videoId} published successfully`, {
     duration: updateData.duration,
     hlsUrl: updateData.hlsUrl,
+    resolutions: updateData.resolutions,
   });
 }
 

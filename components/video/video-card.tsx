@@ -15,6 +15,7 @@ interface VideoCardProps {
     viewsCount: number;
     createdAt: Date | string;
     orientation?: string | null;
+    previewUrl?: string | null;
     user: {
       username: string;
       avatarUrl: string | null;
@@ -58,6 +59,7 @@ export function VideoCard({ video }: VideoCardProps) {
 
   // Generate preview URL from Bunny CDN
   const getPreviewUrl = () => {
+    if (video.previewUrl) return video.previewUrl;
     // If we are here, we are hovering and haven't errored yet, so try the preview URL
     return `https://${BUNNY_PULL_ZONE}/${video.bunnyVideoId}/preview.webp`;
   };

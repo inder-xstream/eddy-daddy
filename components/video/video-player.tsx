@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 
 interface VideoPlayerProps {
@@ -8,99 +8,82 @@ interface VideoPlayerProps {
   thumbnailUrl?: string | null;
   title: string;
   vastTagUrl?: string;
+  previewUrl?: string | null;
 }
 
-export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl }: VideoPlayerProps) {
+interface QualityLevel {
+  height: number;
+  levelIndex: number; // -1 for Auto
+  label: string; 
+}
+
+export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl, previewUrl }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   
+  // Playback State
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [buffered, setBuffered] = useState(0);
+  
+  // Quality State
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1); // -1 = Auto
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+  // Ad State
   const [error, setError] = useState<string | null>(null);
-  const [isAdPlaying, setIsAdPlaying] = useState(!!vastTagUrl);
-  const [adTimeLeft, setAdTimeLeft] = useState(15);
-  const [canSkip, setCanSkip] = useState(false);
+  const [isAdPlaying, setIsAdPlaying] = useState(false); // Ad logic disabled for this MVP replacement to focus on player controls
+  const [adTimeLeft, setAdTimeLeft] = useState(0);
 
-  // Handle Ad Logic
+  // Initial Ad Check (Simplified)
   useEffect(() => {
-    if (!vastTagUrl) {
-      setIsAdPlaying(false);
-      return;
-    }
-
-    // In a real VAST implementation, we would fetch the XML here, parse it,
-    // find the MediaFile, TrackingEvents, etc.
-    // For this MVP, we simulate the ad experience.
-    
-    // Auto-disable ad if no vastTagUrl
-    setIsAdPlaying(true);
-
-    const timer = setInterval(() => {
-      setAdTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAdEnd();
-          return 0;
-        }
-        if (prev <= 10) setCanSkip(true); // Allow skip after 5s (15-10)
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
+     if (vastTagUrl) {
+       // Placeholder: In real app, trigger VAST logic here
+       // For now, we skip ad logic to ensure the custom player works first
+     }
   }, [vastTagUrl]);
 
-  const handleAdEnd = () => {
-    setIsAdPlaying(false);
-    // Auto-play content after ad
-    if (videoRef.current) {
-        // slight delay to ensure DOM update
-        setTimeout(() => videoRef.current?.play().catch(() => {}), 100);
-    }
-  };
-
-  const handleSkipAd = () => {
-    handleAdEnd();
-  };
-
-  // Handle Main Content HLS
+  // Setup HLS
   useEffect(() => {
-    if (isAdPlaying) return; 
-
-    // Reset video state when switching to content
     const video = videoRef.current;
     if (!video) return;
 
-    // Check if HLS is supported
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true, // Low latency for better engagement
-        backBufferLength: 90,
+        lowLatencyMode: true, 
       });
 
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
+      hlsRef.current = hls;
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('Video manifest loaded');
+      hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        const levels = data.levels.map((level, index) => ({
+          height: level.height,
+          levelIndex: index,
+          label: `${level.height}p`,
+        }));
+        // Sort specifically: High to Low
+        levels.sort((a, b) => b.height - a.height);
+        
+        // Add Auto option
+        setQualities([{ height: 0, levelIndex: -1, label: 'Auto' }, ...levels]);
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('HLS error:', data);
         if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              setError('Network error - Failed to load video');
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              setError('Media error - Failed to decode video');
-              hls.recoverMediaError();
-              break;
-            default:
-              setError('Fatal error - Cannot play video');
-              hls.destroy();
-              break;
-          }
+           setError('Error loading video stream');
+           hls.destroy();
         }
       });
 
@@ -108,94 +91,225 @@ export function VideoPlayer({ hlsUrl, thumbnailUrl, title, vastTagUrl }: VideoPl
         hls.destroy();
       };
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS support (Safari)
+      // Safari Native HLS
       video.src = hlsUrl;
-    } else {
-      setError('HLS is not supported in your browser');
     }
-  }, [hlsUrl, isAdPlaying]); // Re-run when ad finishes
+  }, [hlsUrl]);
+
+  // Handle Quality Change
+  const handleQualityChange = (levelIndex: number) => {
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = levelIndex;
+      setCurrentQuality(levelIndex);
+      setShowQualityMenu(false);
+    }
+  };
+
+  // Video Events
+  const onTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+      if (videoRef.current.duration) setDuration(videoRef.current.duration);
+      
+      if (videoRef.current.buffered.length > 0) {
+        setBuffered((videoRef.current.buffered.end(videoRef.current.buffered.length - 1) / videoRef.current.duration) * 100);
+      }
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleVolume = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+      if (!isMuted) setVolume(0);
+      else setVolume(1);
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    if (videoRef.current) {
+       videoRef.current.volume = val;
+       videoRef.current.muted = val === 0;
+       setIsMuted(val === 0);
+    }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current || !videoRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    videoRef.current.currentTime = pos * videoRef.current.duration;
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  // Controls Visibility
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
   return (
-    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group">
+    <div 
+      ref={containerRef}
+      className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group select-none"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setShowControls(false)}
+    >
+      <video
+        ref={videoRef}
+        className="w-full h-full cursor-pointer"
+        onClick={togglePlay}
+        poster={thumbnailUrl || undefined}
+        onTimeUpdate={onTimeUpdate}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        playsInline
+      />
       
-      {/* AD OVERLAY / PLAYER */}
-      {isAdPlaying && (
-        <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center">
-            {/* Mock Ad Player */}
-            <div className="w-full h-full relative bg-black">
-                {/* Placeholder for actual Ad Video */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                    <div className="text-center">
-                        <p className="text-white text-lg font-bold mb-2">Advertisement</p>
-                        <p className="text-gray-400 text-sm">Your content will begin shortly...</p>
-                        {/* Simulating a video playing */}
-                        <div className="mt-8 flex justify-center">
-                             <div className="w-16 h-16 border-4 border-xred-600 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    </div>
-                </div>
+      {/* Loading / Buffering could go here */}
 
-                {/* Ad Controls */}
-                <div className="absolute bottom-8 right-8 flex flex-col items-end gap-2">
-                    <div className="text-white text-sm font-medium bg-black/50 px-3 py-1 rounded">
-                        Ad ends in {adTimeLeft}s
-                    </div>
-                    {canSkip && (
-                        <button 
-                            onClick={handleSkipAd}
-                            className="bg-black/70 hover:bg-black/90 text-white px-6 py-2 rounded-md font-semibold flex items-center gap-2 transition-colors border border-white/20"
-                        >
-                            Skip Ad
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
-                        </button>
-                    )}
-                </div>
-
-                <div className="absolute top-4 left-4 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded shadow-sm">
-                    AD
-                </div>
-                
-                {/* Debug Info about VAST */}
-                <div className="absolute bottom-4 left-4 text-xs text-gray-500 max-w-xs truncate hidden">
-                    VAST Source: {vastTagUrl}
-                </div>
-            </div>
+      {/* ERROR */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+           <p className="text-white bg-red-600/80 px-4 py-2 rounded">{error}</p>
         </div>
       )}
 
-      <video
-        ref={videoRef}
-        className="w-full h-full"
-        controls={!isAdPlaying}
-        playsInline
-        poster={thumbnailUrl || undefined}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        aria-label={title}
-      >
-        Your browser does not support video playback.
-      </video>
-
-      {error && !isAdPlaying && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center p-6">
-            <svg
-              className="w-16 h-16 text-red-500 mx-auto mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <p className="text-white font-medium">{error}</p>
+      {/* BIG PLAY BUTTON (Overlay) */}
+      {!isPlaying && !error && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center cursor-pointer z-10"
+          onClick={togglePlay}
+        >
+          <div className="w-16 h-16 bg-xred-600/90 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg">
+             <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
         </div>
       )}
+
+      {/* CUSTOM CONTROLS */}
+      <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300 z-20 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+        
+        {/* Progress Bar */}
+        <div 
+          ref={progressBarRef}
+          className="w-full h-1.5 bg-gray-600 cursor-pointer rounded-full mb-4 relative hover:h-2.5 transition-all group/progress"
+          onClick={handleSeek}
+        >
+            <div 
+              className="absolute top-0 left-0 h-full bg-white/30 rounded-full" 
+              style={{ width: `${buffered}%` }} 
+            />
+            <div 
+              className="absolute top-0 left-0 h-full bg-xred-600 rounded-full relative" 
+              style={{ width: `${(currentTime / duration) * 100}%` }}
+            >
+               <div className="absolute right-0 -top-1 w-3 h-3 bg-xred-600 rounded-full opacity-0 group-hover/progress:opacity-100 shadow transform scale-150" />
+            </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Play/Pause */}
+            <button onClick={togglePlay} className="text-white hover:text-xred-500 transition-colors">
+              {isPlaying ? (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              )}
+            </button>
+
+            {/* Volume */}
+            <div className="flex items-center gap-2 group/volume">
+               <button onClick={toggleVolume} className="text-white hover:text-gray-300">
+                  {isMuted || volume === 0 ? (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                  )}
+               </button>
+               <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.1" 
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  className="w-0 overflow-hidden group-hover/volume:w-20 transition-all h-1 bg-gray-400 rounded-lg appearance-none cursor-pointer accent-xred-600"
+               />
+            </div>
+
+            {/* Time */}
+            <div className="text-white text-sm">
+               {formatTime(currentTime)} / {formatTime(duration)}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+             {/* Quality Selector */}
+             {qualities.length > 0 && (
+               <div className="relative">
+                 <button 
+                    onClick={() => setShowQualityMenu(!showQualityMenu)}
+                    className="flex items-center gap-1 text-white hover:text-xred-500 text-sm font-semibold border border-white/20 px-2 py-0.5 rounded"
+                 >
+                    {currentQuality === -1 ? 'Auto' : qualities.find(q => q.levelIndex === currentQuality)?.label}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                 </button>
+                 
+                 {showQualityMenu && (
+                   <div className="absolute bottom-full right-0 mb-2 bg-black/90 border border-gray-700 rounded-lg overflow-hidden min-w-[120px] shadow-xl">
+                      {qualities.map((q) => (
+                        <button
+                           key={q.levelIndex}
+                           onClick={() => handleQualityChange(q.levelIndex)}
+                           className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentQuality === q.levelIndex ? 'text-xred-500 font-bold' : 'text-gray-300'}`}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                   </div>
+                 )}
+               </div>
+             )}
+
+             {/* Fullscreen */}
+             <button onClick={toggleFullscreen} className="text-white hover:text-xred-500 transition-colors">
+               {isFullscreen ? (
+                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5z"/></svg>
+               ) : (
+                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+               )}
+             </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -16,7 +16,9 @@ interface VideoMetadata {
   description: string;
   orientation: string;
   selectedModels: string[];
+  newModelNames: string[];
   selectedCategories: string[];
+  tags: string;
 }
 
 interface Model {
@@ -29,14 +31,21 @@ interface Category {
   name: string;
 }
 
+interface Tag {
+  id: string;
+  name: string;
+}
+
 interface VideoUploaderProps {
   models: Model[];
   categories: Category[];
+  availableTags?: Tag[];
 }
 
-export function VideoUploader({ models, categories }: VideoUploaderProps) {
+export function VideoUploader({ models, categories, availableTags = [] }: VideoUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [modelInput, setModelInput] = useState('');
   const [progress, setProgress] = useState<UploadProgress>({
     bytesUploaded: 0,
     bytesTotal: 0,
@@ -47,9 +56,11 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
   const [metadata, setMetadata] = useState<VideoMetadata>({
     title: '',
     description: '',
-    orientation: '',
+    orientation: 'STRAIGHT',
     selectedModels: [],
+    newModelNames: [],
     selectedCategories: [],
+    tags: '',
   });
   
   const uploadRef = useRef<tus.Upload | null>(null);
@@ -70,6 +81,34 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
         ? prev.selectedCategories.filter(id => id !== categoryId)
         : [...prev.selectedCategories, categoryId],
     }));
+  };
+
+  const addCustomModel = () => {
+    if (!modelInput.trim()) return;
+    if (metadata.newModelNames.includes(modelInput.trim())) return;
+    
+    setMetadata(prev => ({
+      ...prev,
+      newModelNames: [...prev.newModelNames, modelInput.trim()]
+    }));
+    setModelInput('');
+  };
+
+  const removeCustomModel = (name: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      newModelNames: prev.newModelNames.filter(n => n !== name)
+    }));
+  };
+
+  const addTag = (tagName: string) => {
+    const currentTags = metadata.tags.split(',').map(t => t.trim()).filter(Boolean);
+    if (!currentTags.includes(tagName)) {
+      setMetadata(prev => ({
+        ...prev,
+        tags: [...currentTags, tagName].join(', ')
+      }));
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,13 +181,21 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
           console.log('Upload Complete! Finalizing...');
           
           try {
+            // Process tags
+            const tagsArray = metadata.tags
+              .split(',')
+              .map(t => t.trim())
+              .filter(t => t.length > 0);
+
             // Step 3: Finalize upload and update metadata
             const result = await finalizeUpload(signature.videoId, {
               title: metadata.title,
               description: metadata.description || undefined,
               orientation: metadata.orientation as any,
               modelIds: metadata.selectedModels,
+              newModelNames: metadata.newModelNames, // Pass new models
               categoryIds: metadata.selectedCategories,
+              tags: tagsArray,
             });
 
             if (result.success) {
@@ -158,9 +205,11 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
               setMetadata({
                 title: '',
                 description: '',
-                orientation: '',
+                orientation: 'STRAIGHT',
                 selectedModels: [],
+                newModelNames: [],
                 selectedCategories: [],
+                tags: '',
               });
             } else {
               setError(result.error || 'Failed to finalize upload');
@@ -206,7 +255,7 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-4">
+      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md p-6 space-y-4 border border-gray-200 dark:border-dark-700">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Upload Video</h2>
         
         {/* Video Metadata */}
@@ -248,26 +297,61 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
             />
           </div>
 
-          {/* Orientation */}
+          {/* Tags */}
           <div>
             <label
-              htmlFor="video-orientation"
+              htmlFor="video-tags"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              Video Orientation
+              Tags (comma separated)
             </label>
-            <select
-              id="video-orientation"
-              value={metadata.orientation}
-              onChange={(e) => setMetadata(prev => ({ ...prev, orientation: e.target.value }))}
+            <input
+              id="video-tags"
+              type="text"
+              value={metadata.tags}
+              onChange={(e) => setMetadata(prev => ({ ...prev, tags: e.target.value }))}
               disabled={uploading}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              <option value="">Select Orientation</option>
-              <option value="LANDSCAPE">Landscape</option>
-              <option value="PORTRAIT">Portrait</option>
-              <option value="SQUARE">Square</option>
-            </select>
+              placeholder="teen, blonde, outdoor, pov"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50 mb-2"
+            />
+            {availableTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="text-gray-500 dark:text-gray-400 self-center">Popular:</span>
+                {availableTags.map(tag => (
+                   <button
+                     key={tag.id}
+                     type="button"
+                     onClick={() => addTag(tag.name)}
+                     className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-300 transition-colors"
+                   >
+                     {tag.name}
+                   </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Orientation */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Orientation
+            </label>
+            <div className="flex gap-4">
+              {['STRAIGHT', 'GAY', 'TRANS', 'LESBIAN'].map((opt) => (
+                <label key={opt} className="inline-flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="orientation"
+                    value={opt}
+                    checked={metadata.orientation === opt}
+                    onChange={(e) => setMetadata(prev => ({ ...prev, orientation: e.target.value }))}
+                    disabled={uploading}
+                    className="form-radio text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  />
+                  <span className="ml-2 text-gray-700 dark:text-gray-300 capitalize">{opt.toLowerCase()}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Categories */}
@@ -298,7 +382,7 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Models
             </label>
-            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md">
+            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-2">
               {models.map((model) => (
                 <button
                   key={model.id}
@@ -313,6 +397,34 @@ export function VideoUploader({ models, categories }: VideoUploaderProps) {
                   {model.stageName}
                 </button>
               ))}
+              {metadata.newModelNames.map((name) => (
+                 <span
+                  key={name}
+                  className="px-3 py-1 text-sm rounded-full bg-pink-100 dark:bg-pink-900 border border-pink-300 dark:border-pink-700 text-pink-800 dark:text-pink-200 flex items-center gap-1"
+                >
+                  {name}
+                  <button type="button" onClick={() => removeCustomModel(name)} className="hover:text-pink-900 dark:hover:text-pink-100">×</button>
+                </span>
+              ))}
+            </div>
+            {/* Add New Model */}
+            <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={modelInput}
+                  onChange={(e) => setModelInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomModel())}
+                  placeholder="Add new model name..."
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                <button 
+                  type="button" 
+                  onClick={addCustomModel}
+                  disabled={!modelInput.trim()}
+                  className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md text-gray-800 dark:text-gray-200 disabled:opacity-50"
+                >
+                  Add
+                </button>
             </div>
           </div>
         </div>

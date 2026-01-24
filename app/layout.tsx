@@ -8,6 +8,7 @@ import './globals.css';
 import { SidebarProvider } from '@/components/providers/sidebar-provider';
 import { AuthModalProvider } from '@/components/providers/auth-modal-provider';
 import { AuthModal } from '@/components/auth/auth-modal';
+import { Footer } from '@/components/layout/footer';
 
 export const metadata: Metadata = {
   title: 'XStream - Adult Video Platform',
@@ -41,9 +42,14 @@ export default function RootLayout({
                 <AgeGateModal />
                 <Navbar />
                 <AuthModal />
-                <div className="flex min-h-screen">
-                  <CategoriesSidebar />
-                  <main className="flex-1 w-full relative">{children}</main>
+                <div className="flex flex-col min-h-screen">
+                  <div className="flex flex-1">
+                    <CategoriesSidebar />
+                    <main className="flex-1 w-full relative">{children}</main>
+                  </div>
+                  <div className="lg:pl-64">
+                    <Footer />
+                  </div>
                 </div>
               </AuthModalProvider>
             </SidebarProvider>

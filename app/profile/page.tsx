@@ -32,7 +32,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <div className="bg-white dark:bg-dark-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-dark-700">
         <div className="flex items-start gap-6">
           <div className="h-24 w-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold">
             {user.username[0].toUpperCase()}
@@ -81,7 +81,7 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-dark-800 rounded-lg shadow p-6 border border-gray-200 dark:border-dark-700">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Your Videos
         </h2>
@@ -93,7 +93,7 @@ export default async function ProfilePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {user.videos.map((video: any) => (
-              <div key={video.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div key={video.id} className="border border-gray-200 dark:border-dark-700 rounded-lg p-4">
                 <h3 className="font-medium text-gray-900 dark:text-white">
                   {video.title}
                 </h3>

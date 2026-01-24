@@ -69,8 +69,15 @@ export async function searchVideos(
             },
           },
           {
-            tags: {
-              hasSome: [searchQuery.toLowerCase()],
+            videoTags: {
+              some: {
+                tag: {
+                  name: {
+                    contains: searchQuery,
+                    mode: 'insensitive',
+                  },
+                },
+              },
             },
           },
         ],

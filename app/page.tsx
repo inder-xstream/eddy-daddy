@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import { CategoryPills } from '@/components/layout/category-pills';
+import { AdBanner } from '@/components/ads/ad-banner';
 import Link from 'next/link';
+import { ReactNode } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,24 +25,65 @@ export default async function HomePage() {
     orderBy: {
       createdAt: 'desc',
     },
-    take: 40, // Increase limit for high density grid
+    take: 40,
   });
+
+  // Helper to inject ads into the grid
+  const renderVideoGrid = () => {
+    const items: ReactNode[] = [];
+    videos.forEach((video, index) => {
+      items.push(
+        <VideoCard 
+          key={video.id} 
+          video={{
+             ...video,
+             thumbnailUrl: video.thumbnailUrl || null,
+             duration: video.duration || null,
+             orientation: (video.orientation as any) || null
+          }} 
+        />
+      );
+
+      // Inject Leaderboard after 8th video (approx 2 rows)
+      if (index === 7) {
+        items.push(
+          <div key="ad-leaderboard-1" className="col-span-2 md:col-span-3 lg:col-span-4 flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50 rounded-lg">
+             <AdBanner slotId="home-native-1" format="leaderboard" />
+          </div>
+        );
+      }
+      
+      // Inject Native/Rectangle ad after 20th video
+       if (index === 19) {
+        items.push(
+          <div key="ad-native-1" className="col-span-1 min-h-[200px] flex items-center justify-center">
+             <AdBanner slotId="home-native-2" format="native" className="h-full w-full" />
+          </div>
+        );
+      }
+    });
+    return items;
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-dark-900">
       
       {/* Sticky Category Helper */}
       <CategoryPills />
-
+      
       <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 py-4">
-        {/* Header - Hidden on mobile if redundant, or minimal */}
+        {/* Top Ad */}
+        <div className="mb-6 flex justify-center">
+           <AdBanner slotId="home-top" format="leaderboard" />
+        </div>
+
+        {/* Header */}
         <div className="mb-6 hidden md:block">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Recomended Videos
+            Recommended Videos
           </h1>
         </div>
 
-        {/* Video Grid - Xhamster Lite Style (2 cols mobile, 4-5 cols desktop) */}
         {videos.length === 0 ? (
           <div className="text-center py-16">
             <svg
@@ -71,18 +114,7 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
-            {videos.map((video) => (
-              <VideoCard 
-                key={video.id} 
-                video={{
-                   ...video,
-                   // Ensure types match what VideoCard expects
-                   thumbnailUrl: video.thumbnailUrl || null,
-                   duration: video.duration || null,
-                   orientation: (video.orientation as any) || null
-                }} 
-              />
-            ))}
+            {renderVideoGrid()}
           </div>
         )}
 

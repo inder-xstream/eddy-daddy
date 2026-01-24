@@ -9,7 +9,18 @@ interface VideoUpdateData {
   description?: string;
   orientation?: 'STRAIGHT' | 'GAY' | 'LESBIAN' | 'TRANS';
   modelIds?: string[];
+  newModelNames?: string[]; // Add support for new models
   categoryIds?: string[];
+  tags?: string[];
+}
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 /**
@@ -37,7 +48,7 @@ export async function finalizeUpload(
       throw new Error('Video not found');
     }
 
-    if (video.userId !== session.user.id) {
+    if (video.userId !== session.user.id && session.user.role !== 'ADMIN') {
       throw new Error('Forbidden: You can only finalize your own uploads');
     }
 
@@ -61,7 +72,7 @@ export async function finalizeUpload(
       },
     });
 
-    // Create model associations
+    // Create model associations (Existing IDs)
     if (metadata?.modelIds && metadata.modelIds.length > 0) {
       await prisma.videoModel.createMany({
         data: metadata.modelIds.map((modelId) => ({
@@ -70,6 +81,40 @@ export async function finalizeUpload(
         })),
         skipDuplicates: true,
       });
+    }
+
+    // Process New Models
+    if (metadata?.newModelNames && metadata.newModelNames.length > 0) {
+      for (const name of metadata.newModelNames) {
+         if (!name.trim()) continue;
+         const slug = generateSlug(name);
+         if (!slug) continue;
+
+         // Upsert Model - User created models are NOT verified by default
+         const model = await prisma.model.upsert({
+            where: { slug },
+            update: {},
+            create: {
+               stageName: name.trim(),
+               slug,
+               isVerified: false, 
+            }
+         });
+
+         await prisma.videoModel.upsert({
+            where: {
+               videoId_modelId: {
+                 videoId: updatedVideo.id,
+                 modelId: model.id,
+               }
+            },
+            update: {},
+            create: {
+               videoId: updatedVideo.id,
+               modelId: model.id,
+            }
+         });
+      }
     }
 
     // Create category associations
@@ -81,6 +126,41 @@ export async function finalizeUpload(
         })),
         skipDuplicates: true,
       });
+    }
+
+    // Process Tags
+    if (metadata?.tags && metadata.tags.length > 0) {
+      for (const tagName of metadata.tags) {
+        if (!tagName.trim()) continue;
+        
+        const slug = generateSlug(tagName);
+        if (!slug) continue;
+
+        // Upsert tag
+        const tag = await prisma.tag.upsert({
+          where: { slug },
+          update: {},
+          create: {
+            name: tagName.trim(),
+            slug,
+          },
+        });
+
+        // Link tag to video
+        await prisma.videoTag.upsert({
+          where: {
+             videoId_tagId: {
+               videoId: updatedVideo.id,
+               tagId: tag.id
+             }
+          },
+          update: {},
+          create: {
+            videoId: updatedVideo.id,
+            tagId: tag.id,
+          },
+        });
+      }
     }
 
     // Revalidate relevant pages
@@ -101,151 +181,56 @@ export async function finalizeUpload(
   }
 }
 
-/**
- * Update video metadata
- * Owner-only action
- */
-export async function updateVideoMetadata(
-  videoId: string,
-  data: VideoUpdateData
-) {
-  try {
-    const session = await auth();
+export async function getAdminVideos(page = 1, limit = 20, status?: string) {
+  const session = await auth();
+  if (session?.user?.role !== 'ADMIN') {
+    throw new Error('Unauthorized');
+  }
 
-    if (!session?.user?.id) {
-      throw new Error('Unauthorized');
-    }
+  const skip = (page - 1) * limit;
+  const where = status ? { status: status as any } : {};
 
-    // Verify ownership
-    const video = await prisma.video.findUnique({
-      where: { id: videoId },
-      select: { userId: true },
-    });
-
-    if (!video) {
-      throw new Error('Video not found');
-    }
-
-    if (video.userId !== session.user.id) {
-      throw new Error('Forbidden: You can only edit your own videos');
-    }
-
-    // Update metadata
-    await prisma.video.update({
-      where: { id: videoId },
-      data: {
-        ...(data.title && { title: data.title }),
-        ...(data.description && { description: data.description }),
+  const [videos, total] = await Promise.all([
+    prisma.video.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        user: { select: { username: true, email: true } },
       },
-    });
-
-    revalidatePath('/profile');
-    revalidatePath(`/video/${videoId}`);
-
-    return {
-      success: true,
-      message: 'Video updated successfully',
-    };
-  } catch (error) {
-    console.error('Error updating video:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to update video',
-    };
-  }
-}
-
-/**
- * Delete video
- * Owner-only action
- */
-export async function deleteVideo(videoId: string) {
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      throw new Error('Unauthorized');
-    }
-
-    // Verify ownership
-    const video = await prisma.video.findUnique({
-      where: { id: videoId },
-      select: { userId: true, bunnyVideoId: true },
-    });
-
-    if (!video) {
-      throw new Error('Video not found');
-    }
-
-    if (video.userId !== session.user.id) {
-      throw new Error('Forbidden: You can only delete your own videos');
-    }
-
-    // Delete from database (cascades to related records)
-    await prisma.video.delete({
-      where: { id: videoId },
-    });
-
-    // TODO: Optionally delete from Bunny CDN
-    // const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
-    // const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
-    // await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${video.bunnyVideoId}`, {
-    //   method: 'DELETE',
-    //   headers: { AccessKey: BUNNY_API_KEY },
-    // });
-
-    revalidatePath('/profile');
-    revalidatePath('/');
-
-    return {
-      success: true,
-      message: 'Video deleted successfully',
-    };
-  } catch (error) {
-    console.error('Error deleting video:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete video',
-    };
-  }
-}
-
-/**
- * Get user's videos
- */
-export async function getUserVideos() {
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      throw new Error('Unauthorized');
-    }
-
-    const videos = await prisma.video.findMany({
-      where: { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        bunnyVideoId: true,
-        title: true,
-        description: true,
-        thumbnailUrl: true,
-        duration: true,
-        status: true,
-        viewsCount: true,
-        likesCount: true,
-        createdAt: true,
-        publishedAt: true,
-      },
-    });
+    }),
+    prisma.video.count({ where }),
+  ]);
 
-    return { success: true, videos };
-  } catch (error) {
-    console.error('Error fetching user videos:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch videos',
-      videos: [],
-    };
+  return { videos, total, pages: Math.ceil(total / limit) };
+}
+
+export async function updateVideoStatus(videoId: string, status: string) {
+  const session = await auth();
+  if (session?.user?.role !== 'ADMIN') {
+     throw new Error('Unauthorized');
   }
+  
+  await prisma.video.update({
+    where: { id: videoId },
+    data: { status: status as any },
+  });
+  
+  revalidatePath('/admin/videos');
+  return { success: true };
+}
+
+export async function deleteVideo(videoId: string) {
+  const session = await auth();
+  if (session?.user?.role !== 'ADMIN') {
+     throw new Error('Unauthorized');
+  }
+
+  await prisma.video.delete({
+    where: { id: videoId },
+  });
+  
+  revalidatePath('/admin/videos');
+  return { success: true };
 }

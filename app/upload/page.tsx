@@ -2,8 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { VideoUploader } from '@/components/upload/video-uploader';
 
 export default async function UploadPage() {
-  // Fetch models and categories for selection
-  const [models, categories] = await Promise.all([
+  // Fetch models, categories, and top tags for selection
+  const [models, categories, tags] = await Promise.all([
     prisma.model.findMany({
       where: { isVerified: true },
       select: { id: true, stageName: true },
@@ -14,10 +14,14 @@ export default async function UploadPage() {
       select: { id: true, name: true },
       orderBy: { sortOrder: 'asc' },
     }),
+    prisma.tag.findMany({
+      take: 50,
+      orderBy: { name: 'asc' },
+    }),
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
@@ -29,7 +33,11 @@ export default async function UploadPage() {
             </p>
           </div>
           
-          <VideoUploader models={models} categories={categories} />
+          <VideoUploader 
+            models={models} 
+            categories={categories} 
+            availableTags={tags}
+          />
 
           <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">

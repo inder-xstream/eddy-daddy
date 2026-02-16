@@ -14,17 +14,16 @@ export function AuthUrlListener() {
     const auth = searchParams.get('auth');
     if (auth === 'signin') {
       openModal('signin');
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('auth');
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     } else if (auth === 'signup') {
       openModal('signup');
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('auth');
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-    
-    // Optional: Clean up URL after opening (but might be annoying if refreshing)
-    // if (auth) {
-    //   const params = new URLSearchParams(searchParams.toString());
-    //   params.delete('auth');
-    //   router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    // }
-  }, [searchParams, openModal]);
+  }, [searchParams, openModal, router, pathname]);
 
   return null;
 }

@@ -12,6 +12,7 @@ export const authConfig = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  providers: [],
   callbacks: {
     async jwt({ token, user }: { token: JWT; user: User }) {
       if (user) {
@@ -32,5 +33,4 @@ export const authConfig = {
       return session;
     },
   },
-  providers: [],
 } satisfies NextAuthConfig;

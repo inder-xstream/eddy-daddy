@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/components/providers/sidebar-provider';
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 interface Category {
   id: string;
@@ -97,6 +99,17 @@ export function Sidebar({ categories }: SidebarProps) {
              History
           </Link>
         </div>
+      </div>
+      
+      {/* Sidebar Ad (300x250) */}
+      <div className="px-4 py-6 border-t border-gray-100 dark:border-dark-800 flex justify-center">
+         <AdUnit 
+            zoneId={adConfig.exoclick.sidebarZoneId} 
+            width={300} 
+            height={250} 
+            className="rounded shadow-sm"
+            fallbackText="300x250 Sidebar"
+         />
       </div>
 
       {/* Theme Toggle - Fixed at bottom */}

@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import Link from 'next/link';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 export const metadata = {
-  title: 'New Videos - XStream',
-  description: 'Watch the latest uploaded videos on XStream.',
+  title: 'New Videos - eddythedaddy',
+  description: 'Watch the latest uploaded videos on eddythedaddy.',
 };
 
 export default async function NewVideosPage() {
@@ -42,7 +43,13 @@ export default async function NewVideosPage() {
 
       <div className="max-w-[1800px] mx-auto px-4 py-6">
           <div className="mb-6 flex justify-center">
-               <AdBanner slotId="new-videos-top" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Top Banner"
+             />
           </div>
 
         {videos.length === 0 ? (

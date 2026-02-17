@@ -6,7 +6,7 @@ import { createCustomerPortal } from '@/server/actions/stripe';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Settings - XStream',
+  title: 'Settings - eddythedaddy',
 };
 
 export default async function SettingsPage() {

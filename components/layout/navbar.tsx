@@ -41,7 +41,7 @@ export function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-1">
               <span className="text-2xl font-black tracking-tighter text-gray-900 dark:text-white">
-                X<span className="text-xred-600">Stream</span>
+                eddythe<span className="text-xred-600">daddy</span>
               </span>
             </Link>
 

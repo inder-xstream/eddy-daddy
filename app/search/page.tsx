@@ -2,7 +2,8 @@ import { searchVideos, getPopularSearches } from '@/server/actions/search';
 import { VideoCard } from '@/components/video/video-card';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +19,8 @@ export async function generateMetadata({ searchParams }: SearchPageProps) {
   const query = params.q || '';
   
   return {
-    title: query ? `Search: ${query} - XStream` : 'Search - XStream',
-    description: 'Search for videos on XStream',
+    title: query ? `Search: ${query} - eddythedaddy` : 'Search - eddythedaddy',
+    description: 'Search for videos on eddythedaddy',
   };
 }
 
@@ -142,9 +143,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
       <div className="max-w-[1800px] mx-auto px-4 py-6">
          {/* Top Ad */}
-         <div className="mb-8 flex justify-center">
-            <AdBanner slotId="search-top" format="leaderboard" />
-         </div>
+         <AdUnit 
+                zoneId={adConfig.exoclick.footerZoneId}
+                width={728}
+                height={90}
+                className="w-full max-w-[728px] mx-auto"
+                fallbackText="Search Header Ad"
+            />
 
         {/* Popular Searches (Zero Query State) */}
         {!query && (
@@ -196,7 +201,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         )}
         
         <div className="mt-8 flex justify-center">
-            <AdBanner slotId="search-bottom" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Search Banner"
+             />
          </div>
       </div>
     </div>

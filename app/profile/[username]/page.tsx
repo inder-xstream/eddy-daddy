@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import { notFound } from 'next/navigation';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 import { auth } from '@/lib/auth-helper';
 
 interface ProfilePageProps {
@@ -13,8 +14,8 @@ interface ProfilePageProps {
 export async function generateMetadata({ params }: ProfilePageProps) {
   const { username } = await params;
   return {
-    title: `${username}'s Channel - XStream`,
-    description: `Watch videos uploaded by ${username} on XStream.`,
+    title: `${username}'s Channel - eddythedaddy`,
+    description: `Watch videos uploaded by ${username} on eddythedaddy.`,
   };
 }
 
@@ -133,7 +134,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           
           {/* Ad Slot */}
           <div className="my-8 flex justify-center">
-             <AdBanner slotId="channel-footer" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Channel Banner"
+             />
           </div>
       </div>
     </div>

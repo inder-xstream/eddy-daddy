@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import { notFound } from 'next/navigation';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 interface TagPageProps {
   params: Promise<{
@@ -22,8 +23,8 @@ export async function generateMetadata({ params }: TagPageProps) {
   }
 
   return {
-    title: `${tag.name} Videos - XStream`,
-    description: `Watch popular ${tag.name} videos on XStream.`,
+    title: `${tag.name} Videos - eddythedaddy`,
+    description: `Watch popular ${tag.name} videos on eddythedaddy.`,
   };
 }
 
@@ -80,7 +81,13 @@ export default async function TagPage({ params }: TagPageProps) {
       <div className="max-w-[1800px] mx-auto px-4 py-6">
           {/* Ad Slot */}
           <div className="mb-8 flex justify-center">
-               <AdBanner slotId="tag-page-header" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Tag Header"
+             />
           </div>
 
           {videos.length > 0 ? (

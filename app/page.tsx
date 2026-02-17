@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import { CategoryPills } from '@/components/layout/category-pills';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 import Link from 'next/link';
 import { ReactNode } from 'react';
 
@@ -59,8 +60,14 @@ export default async function HomePage(props: { searchParams: Promise<{ sort?: s
       // Inject Leaderboard after 8th video (approx 2 rows)
       if (index === AD_POSITIONS.LEADERBOARD) {
         items.push(
-          <div key="ad-leaderboard-1" className="col-span-2 md:col-span-3 lg:col-span-4 flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50 rounded-lg">
-             <AdBanner slotId="home-native-1" format="leaderboard" />
+          <div key="ad-leaderboard-1" className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50 rounded-lg">
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Home Banner"
+             />
           </div>
         );
       }
@@ -69,7 +76,13 @@ export default async function HomePage(props: { searchParams: Promise<{ sort?: s
        if (index === AD_POSITIONS.NATIVE) {
         items.push(
           <div key="ad-native-1" className="col-span-1 min-h-[200px] flex items-center justify-center">
-             <AdBanner slotId="home-native-2" format="native" className="h-full w-full" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.sidebarZoneId} 
+               width={300} 
+               height={250} 
+               className="shadow-sm"
+               fallbackText="300x250 Native Ad"
+             />
           </div>
         );
       }
@@ -86,7 +99,13 @@ export default async function HomePage(props: { searchParams: Promise<{ sort?: s
       <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 py-4">
         {/* Top Ad */}
         <div className="mb-6 flex justify-center">
-           <AdBanner slotId="home-top" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Top Banner"
+             />
         </div>
 
         {/* Header */}

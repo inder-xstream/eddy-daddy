@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { VideoCard } from '@/components/video/video-card';
 import Link from 'next/link';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 interface BestVideosPageProps {
   searchParams: Promise<{
@@ -10,8 +11,8 @@ interface BestVideosPageProps {
 }
 
 export const metadata = {
-  title: 'Best Videos - XStream',
-  description: 'Watch the most popular videos on XStream.',
+  title: 'Best Videos - eddythedaddy',
+  description: 'Watch the most popular videos on eddythedaddy.',
 };
 
 export default async function BestVideosPage({ searchParams }: BestVideosPageProps) {
@@ -81,7 +82,13 @@ export default async function BestVideosPage({ searchParams }: BestVideosPagePro
 
       <div className="max-w-[1800px] mx-auto px-4 py-6">
           <div className="mb-6 flex justify-center">
-               <AdBanner slotId="best-videos-top" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Top Banner"
+             />
           </div>
 
         {videos.length === 0 ? (

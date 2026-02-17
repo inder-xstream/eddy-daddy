@@ -11,9 +11,11 @@ import { AuthModal } from '@/components/auth/auth-modal';
 import { AuthUrlListener } from '@/components/auth/auth-url-listener';
 import { Footer } from '@/components/layout/footer';
 import { Suspense } from 'react';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 export const metadata: Metadata = {
-  title: 'XStream - Adult Video Platform',
+  title: 'eddythedaddy - Adult Video Platform',
   description: 'Premium adult entertainment platform',
   other: {
     'rating': 'RTA-5042-1996-1400-1577-RTA',
@@ -53,6 +55,23 @@ export default function RootLayout({
                     <main className="flex-1 w-full relative">{children}</main>
                   </div>
                   <div className="lg:pl-64">
+                    {/* Fixed Footer Ad (728x90) or Mobile (300x50/300x100) */}
+                    <div className="flex flex-col items-center justify-center my-6 gap-4">
+                       <AdUnit 
+                         zoneId={adConfig.exoclick.footerZoneId} 
+                         width={728} 
+                         height={90} 
+                         className="hidden md:block shadow-sm"
+                         fallbackText="728x90 Banner"
+                       />
+                       <AdUnit 
+                         zoneId={adConfig.exoclick.mobileZoneId} 
+                         width={300} 
+                         height={50} 
+                         className="block md:hidden shadow-sm"
+                         fallbackText="Mobile Banner"
+                       />
+                    </div>
                     <Footer />
                   </div>
                 </div>

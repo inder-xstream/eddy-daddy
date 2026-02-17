@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: ModelPageProps) {
   }
 
   return {
-    title: `${model.stageName} - XStream`,
+    title: `${model.stageName} - eddythedaddy`,
     description: model.bio || `Watch videos featuring ${model.stageName}`,
   };
 }

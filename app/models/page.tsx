@@ -5,7 +5,7 @@ import Image from 'next/image';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Models - XStream',
+  title: 'Models - eddythedaddy',
   description: 'Browse our collection of adult performers',
 };
 

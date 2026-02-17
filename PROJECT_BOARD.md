@@ -2,6 +2,7 @@
 
 ## 🚀 Active Sprint Checklist
 - [x] **Project Build Check**: `npm run build` passing.
+- [x] **Ad System Implementation**: Integrated ExoClick conditional ads.
 - [x] **Search UI Refactor**: Aligned with Category page design (Tube theme).
 - [ ] **Search Bar Removal**: Ensure redundant search bars are gone globally (Results page done).
 

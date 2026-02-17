@@ -6,7 +6,8 @@ import CommentSection from '@/components/comments/comment-section';
 import { CommentWrapper } from '@/components/comments/comment-wrapper';
 import { VideoTags } from '@/components/video/video-tags';
 import { RelatedVideos } from '@/components/video/related-videos';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 import { getLikeStatus, getSubscriptionStatus } from '@/server/actions/engagement';
 import { getViewCount } from '@/server/actions/view';
 import { getComments } from '@/server/actions/comment';
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: VideoPageProps) {
 
   return {
     title: video.title,
-    description: video.description || 'Watch this video on XStream',
+    description: video.description || 'Watch this video on eddythedaddy',
   };
 }
 
@@ -170,7 +171,13 @@ export default async function VideoPage({ params }: VideoPageProps) {
       {/* Top Banner Ad - Leaderboard */}
       {!isPremiumUser && (
         <div className="flex justify-center py-4 bg-gray-50 dark:bg-dark-950/50">
-           <AdBanner slotId="video-top-leaderboard" format="leaderboard" />
+           <AdUnit 
+             zoneId={adConfig.exoclick.footerZoneId} 
+             width={728} 
+             height={90} 
+             className="shadow-sm"
+             fallbackText="728x90 Top Banner"
+           />
         </div>
       )}
 
@@ -209,7 +216,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
                   hlsUrl={video.hlsUrl} 
                   thumbnailUrl={video.thumbnailUrl} 
                   title={video.title}
-                  vastTagUrl="https://example.com/vast.xml" 
+                  vastTagUrl={process.env.NEXT_PUBLIC_VAST_TAG_URL || ''} // VAST tag support
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -219,6 +226,17 @@ export default async function VideoPage({ params }: VideoPageProps) {
                    </div>
                 </div>
               )}
+            </div>
+            
+            {/* Ad Banner - Below Player (Mobile/Desktop) */}
+            <div className="my-4 flex justify-center">
+               <AdUnit 
+                  zoneId={adConfig.exoclick.mobileZoneId} 
+                  width={300} 
+                  height={100}
+                  className="rounded shadow-sm"
+                  fallbackText="300x100 Premium Ad" 
+               />
             </div>
             
             {/* 4. Single Row Actions (Subscribe + Like/Share/etc) */}
@@ -280,8 +298,16 @@ export default async function VideoPage({ params }: VideoPageProps) {
             </div>
 
             {/* 5. Ads Section */}
-            <div className="my-2 hidden md:block">
-                {!isPremiumUser && <AdBanner slotId="video-under-actions" format="leaderboard" className="w-full" />}
+            <div className="my-2 hidden md:flex justify-center">
+                {!isPremiumUser && (
+                   <AdUnit 
+                      zoneId={adConfig.exoclick.footerZoneId} // Reusing horizontal zone
+                      width={728} 
+                      height={90} 
+                      className="shadow-sm" 
+                      fallbackText="728x90 Mid Banner"
+                   />
+                )}
             </div>
             
             {/* Description */}

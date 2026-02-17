@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Content Studio - XStream',
+  title: 'Content Studio - eddythedaddy',
 };
 
 export default async function StudioPage() {

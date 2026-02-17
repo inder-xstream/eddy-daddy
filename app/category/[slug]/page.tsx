@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { VideoCard } from '@/components/video/video-card';
 import Link from 'next/link';
-import { AdBanner } from '@/components/ads/ad-banner';
+import { AdUnit } from '@/components/ads/ad-unit';
+import { adConfig } from '@/lib/ads';
 
 interface CategoryPageProps {
   params: Promise<{
@@ -25,7 +26,7 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   }
 
   return {
-    title: `${category.name} Videos - XStream`,
+    title: `${category.name} Videos - eddythedaddy`,
     description: category.description || `Watch ${category.name} videos`,
   };
 }
@@ -136,7 +137,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       <div className="max-w-[1800px] mx-auto px-4 py-6">
           {/* Ad Slot */}
           <div className="mb-6 flex justify-center">
-               <AdBanner slotId="category-top" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Top Banner"
+             />
           </div>
 
         {/* Videos Grid */}
@@ -163,7 +170,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         )}
         
          <div className="mt-8 flex justify-center">
-               <AdBanner slotId="category-bottom" format="leaderboard" />
+             <AdUnit 
+               zoneId={adConfig.exoclick.footerZoneId} 
+               width={728} 
+               height={90} 
+               className="shadow-sm"
+               fallbackText="728x90 Bottom Banner"
+             />
          </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/app/providers/theme-provider';
 import { Navbar } from '@/components/layout/navbar';
 import { CategoriesSidebar } from '@/components/layout/categories-sidebar';
 import { AgeGateModal } from '@/components/compliance/age-gate-modal';
+import { CookieConsent } from '@/components/compliance/cookie-consent';
 import './globals.css';
 import { SidebarProvider } from '@/components/providers/sidebar-provider';
 import { AuthModalProvider } from '@/components/providers/auth-modal-provider';
@@ -48,6 +49,7 @@ export default async function RootLayout({
             <SidebarProvider>
               <AuthModalProvider>
                 <AgeGateModal />
+                <CookieConsent />
                 <Navbar />
                 <Suspense fallback={null}>
                   <AuthUrlListener />

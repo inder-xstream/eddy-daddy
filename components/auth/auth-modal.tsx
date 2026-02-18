@@ -16,6 +16,7 @@ export function AuthModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Sign In State
   const [signInData, setSignInData] = useState({
@@ -248,9 +249,26 @@ export function AuthModal() {
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-xred-500 focus:border-transparent outline-none transition-colors"
                   />
                 </div>
+                {/* Age & TOS Agreement */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-xred-600 focus:ring-xred-500 accent-xred-600 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200 transition-colors">
+                    I confirm I am at least <strong>18 years old</strong> and agree to the{' '}
+                    <Link href="/legal/terms" className="text-xred-600 hover:underline" target="_blank" onClick={(e) => e.stopPropagation()}>Terms of Service</Link>{' '}
+                    and{' '}
+                    <Link href="/legal/privacy" className="text-xred-600 hover:underline" target="_blank" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>.
+                  </span>
+                </label>
+
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !agreedToTerms}
                   className="w-full py-3 px-4 bg-xred-600 hover:bg-xred-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Creating Account...' : 'Create Account'}
@@ -260,7 +278,10 @@ export function AuthModal() {
 
             <div className="mt-6 text-center border-t border-gray-200 dark:border-gray-800 pt-6">
               <p className="text-xs text-gray-500">
-                By continuing, you agree to our Terms of Service and Privacy Policy.
+                By continuing, you agree to our{' '}
+                <Link href="/legal/terms" className="text-xred-600 hover:underline" target="_blank">Terms of Service</Link>{' '}
+                and{' '}
+                <Link href="/legal/privacy" className="text-xred-600 hover:underline" target="_blank">Privacy Policy</Link>.
               </p>
             </div>
           </div>

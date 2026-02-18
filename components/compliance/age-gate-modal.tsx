@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 const AGE_GATE_KEY = 'age_verified';
 
 export function AgeGateModal() {
   const [showModal, setShowModal] = useState(false);
+  const [ageChecked, setAgeChecked] = useState(false);
+  const [tosChecked, setTosChecked] = useState(false);
 
   useEffect(() => {
     // Check if user has already verified age
@@ -15,7 +18,10 @@ export function AgeGateModal() {
     }
   }, []);
 
+  const canEnter = ageChecked && tosChecked;
+
   const handleEnter = () => {
+    if (!canEnter) return;
     localStorage.setItem(AGE_GATE_KEY, 'true');
     setShowModal(false);
   };
@@ -27,7 +33,7 @@ export function AgeGateModal() {
   if (!showModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black bg-opacity-95 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-8 text-center">
         {/* Warning Icon */}
         <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
@@ -61,11 +67,46 @@ export function AgeGateModal() {
           </p>
         </div>
 
+        {/* Checkboxes */}
+        <div className="space-y-3 mb-6 text-left">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={ageChecked}
+              onChange={(e) => setAgeChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+              I confirm that I am at least <strong>18 years of age</strong> or the age of majority in my jurisdiction.
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={tosChecked}
+              onChange={(e) => setTosChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+              I have read and agree to the{' '}
+              <Link href="/legal/terms" className="text-blue-600 hover:underline" target="_blank">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/legal/privacy" className="text-blue-600 hover:underline" target="_blank">
+                Privacy Policy
+              </Link>.
+            </span>
+          </label>
+        </div>
+
         {/* Buttons */}
         <div className="flex flex-col gap-3">
           <button
             onClick={handleEnter}
-            className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={!canEnter}
+            className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
           >
             I am 18 or older - Enter
           </button>
@@ -80,6 +121,10 @@ export function AgeGateModal() {
         {/* Legal Notice */}
         <p className="mt-6 text-xs text-gray-500 dark:text-gray-400">
           Our parental controls page explains how you can easily block access to this site.
+          By using this site, you also agree to our{' '}
+          <Link href="/legal/cookies" className="text-blue-500 hover:underline" target="_blank">
+            Cookie Policy
+          </Link>.
         </p>
       </div>
     </div>

@@ -130,7 +130,7 @@ export function AdminUploadForm({ categories }: { categories: CategoryOption[] }
         {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title.message}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Category */}
         <div>
           <label className="block text-sm font-medium dark:text-gray-300">Category</label>
@@ -148,7 +148,7 @@ export function AdminUploadForm({ categories }: { categories: CategoryOption[] }
         {/* Orientation */}
         <div>
           <label className="block text-sm font-medium dark:text-gray-300">Orientation</label>
-          <div className="mt-2 flex gap-4">
+          <div className="mt-2 grid grid-cols-2 sm:flex gap-3 sm:gap-4">
             {['STRAIGHT', 'GAY', 'TRANS', 'LESBIAN'].map((opt) => (
               <label key={opt} className="inline-flex items-center">
                 <input 

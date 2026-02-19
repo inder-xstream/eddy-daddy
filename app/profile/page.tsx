@@ -34,9 +34,13 @@ export default async function ProfilePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white dark:bg-dark-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-dark-700">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
-          <div className="h-24 w-24 rounded-full bg-xred-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
-            {user.username[0].toUpperCase()}
-          </div>
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.username} className="h-24 w-24 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="h-24 w-24 rounded-full bg-xred-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
+              {user.username[0].toUpperCase()}
+            </div>
+          )}
           
           <div className="flex-1 text-center sm:text-left">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">

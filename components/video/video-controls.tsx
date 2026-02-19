@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { PLAYBACK_SPEEDS, type QualityLevel } from './use-video-player';
 
 interface VideoControlsProps {
@@ -62,6 +63,8 @@ export function VideoControls({
   setShowSpeedMenu,
   formatTime,
 }: VideoControlsProps) {
+  const [showMobileVolume, setShowMobileVolume] = useState(false);
+
   return (
     <div
       className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300 z-20 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
@@ -154,7 +157,8 @@ export function VideoControls({
             </svg>
           </button>
 
-          {/* Volume */}
+          {/* Volume - Desktop: hover-reveal slider | Mobile: tap-toggle vertical slider */}
+          {/* Desktop Volume */}
           <div className="hidden sm:flex items-center gap-2 group/volume">
             <button
               onClick={toggleVolume}
@@ -200,6 +204,55 @@ export function VideoControls({
             />
           </div>
 
+          {/* Mobile Volume */}
+          <div className="relative sm:hidden">
+            <button
+              onClick={() => setShowMobileVolume(prev => !prev)}
+              className="text-white hover:text-gray-300 p-2"
+              title={isMuted ? 'Unmute' : 'Volume'}
+              aria-label={showMobileVolume ? 'Close volume slider' : 'Open volume slider'}
+              aria-expanded={showMobileVolume}
+            >
+              {isMuted || volume === 0 ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              ) : volume < 0.5 ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+              )}
+            </button>
+            {showMobileVolume && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-black/90 rounded-lg px-3 py-4 flex flex-col items-center gap-2 shadow-xl z-30">
+                <span className="text-white text-xs font-medium tabular-nums">{Math.round(volume * 100)}%</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  aria-label="Volume"
+                  className="w-24 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-xred-600"
+                  style={{ writingMode: 'horizontal-tb' }}
+                />
+                <button
+                  onClick={toggleVolume}
+                  className="text-xs text-gray-400 hover:text-white transition-colors mt-1"
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? 'Unmute' : 'Mute'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Time */}
           <div className="text-white text-xs sm:text-sm">
             {formatTime(currentTime)} / {formatTime(duration)}
@@ -213,6 +266,7 @@ export function VideoControls({
               onClick={() => {
                 setShowSpeedMenu((prev: boolean) => !prev);
                 setShowQualityMenu(false);
+                setShowMobileVolume(false);
               }}
               className="text-white hover:text-xred-500 text-sm font-semibold w-8 text-center"
               title="Playback Speed"
@@ -247,6 +301,7 @@ export function VideoControls({
                 onClick={() => {
                   setShowQualityMenu((prev: boolean) => !prev);
                   setShowSpeedMenu(false);
+                  setShowMobileVolume(false);
                 }}
                 className="flex items-center gap-1 text-white hover:text-xred-500 text-sm font-semibold border border-white/20 px-2 py-0.5 rounded"
                 title="Quality"

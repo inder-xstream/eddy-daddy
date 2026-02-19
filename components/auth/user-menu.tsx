@@ -71,8 +71,14 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={isOpen}
       >
-        <div className="h-8 w-8 rounded-full bg-xred-600 flex items-center justify-center text-white font-medium">
-          {session.user.username?.[0]?.toUpperCase() || 'U'}
+        <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+          {session.user.avatarUrl ? (
+            <img src={session.user.avatarUrl} alt={session.user.username || 'User'} className="h-8 w-8 rounded-full object-cover" />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-xred-600 flex items-center justify-center text-white font-medium">
+              {session.user.username?.[0]?.toUpperCase() || 'U'}
+            </div>
+          )}
         </div>
         <span className="hidden md:inline text-sm font-medium text-gray-900 dark:text-white">
           {session.user.username}

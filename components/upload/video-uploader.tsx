@@ -361,7 +361,7 @@ export function VideoUploader({ models, categories, availableTags = [], isAdmin 
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Orientation
             </label>
-            <div className="flex gap-4">
+            <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-4">
               {['STRAIGHT', 'GAY', 'TRANS', 'LESBIAN'].map((opt) => (
                 <label key={opt} className="inline-flex items-center cursor-pointer">
                   <input

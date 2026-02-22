@@ -212,7 +212,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
                   hlsUrl={video.hlsUrl} 
                   thumbnailUrl={video.thumbnailUrl} 
                   title={video.title}
-                  vastTagUrl={process.env.NEXT_PUBLIC_VAST_TAG_URL || ''} // VAST tag support
+                  vastTagUrl={adConfig.vastTagUrl}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">

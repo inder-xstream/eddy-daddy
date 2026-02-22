@@ -9,4 +9,6 @@ export const adConfig = {
     footerZoneId: process.env.NEXT_PUBLIC_EXOCLICK_ZONE_FOOTER,
     mobileZoneId: process.env.NEXT_PUBLIC_EXOCLICK_ZONE_MOBILE,
   },
+  /** VAST pre-roll tag URL from ExoClick (In-Stream Video zone) */
+  vastTagUrl: process.env.NEXT_PUBLIC_VAST_TAG_URL || '',
 };

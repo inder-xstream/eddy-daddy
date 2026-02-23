@@ -20,8 +20,13 @@ export const authOptions: NextAuthConfig = {
           throw new Error('Email and password are required');
         }
 
+        const email = (credentials.email as string).trim().toLowerCase();
+        const password = credentials.password as string;
+
+        console.log('[auth] Login attempt for:', email);
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email },
           select: {
             id: true,
             email: true,
@@ -34,13 +39,13 @@ export const authOptions: NextAuthConfig = {
         });
 
         if (!user || !user.password) {
+          console.log('[auth] User not found or no password set');
           throw new Error('Invalid email or password');
         }
 
-        const isPasswordValid = await compare(
-          credentials.password as string,
-          user.password as string
-        );
+        console.log('[auth] User found, comparing password...');
+        const isPasswordValid = await compare(password, user.password);
+        console.log('[auth] Password valid:', isPasswordValid);
 
         if (!isPasswordValid) {
           throw new Error('Invalid email or password');
